@@ -29,7 +29,7 @@ jobs:
       - name: autogenerate
         run: ./autogen.sh
       - name: configure
-        run: ./configure --with-llvm-config=/usr/bin/llvm-config-20
+        run: ./configure --with-llvm=$(llvm-config-20 --prefix)
       - name: make
         run: make
       - name: Run tests
@@ -72,6 +72,6 @@ jobs:
       - name: autogenerate
         run: ./autogen.sh
       - name: configure
-        run: ./configure --with-llvm-config=/usr/bin/llvm-config-${{ matrix.llvm }}
+        run: ./configure --with-llvm=$(llvm-config-${{ matrix.llvm }} --prefix)
       - name: Run tests
         run: bazel test --test_output=errors tests:all
