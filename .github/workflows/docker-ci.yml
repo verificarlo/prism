@@ -15,9 +15,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install LLVM
-        uses: KyleMayes/install-llvm-action@v2.0.5
+        uses: KyleMayes/install-llvm-action@v2.0.9
         with:
-          version: "18"
+          version: "20"
       - name: Install Bazelisk
         uses: bazelbuild/setup-bazelisk@v3
       - name: Set up environment
@@ -41,26 +41,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-20.04
-            llvm: 7
-          - os: ubuntu-20.04
-            llvm: 8
-          - os: ubuntu-20.04
-            llvm: 9
-          - os: ubuntu-20.04
-            llvm: 10
-          - os: ubuntu-22.04
-            llvm: 11
-          - os: ubuntu-22.04
-            llvm: 12
-          - os: ubuntu-22.04
-            llvm: 13
-          - os: ubuntu-22.04
-            llvm: 14
-          - os: ubuntu-22.04
-            llvm: 15
-          - os: ubuntu-24.04
-            llvm: 16
           - os: ubuntu-24.04
             llvm: 17
           - os: ubuntu-24.04
@@ -74,7 +54,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install LLVM
-        uses: KyleMayes/install-llvm-action@v2.0.5
+        uses: KyleMayes/install-llvm-action@v2.0.9
         with:
           version: ${{ matrix.llvm }}
       - name: Install Bazelisk
