@@ -6,6 +6,9 @@
 #endif
 
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <type_traits>
 
 #include "hwy/highway.h"
 #include "hwy/print-inl.h"
@@ -27,7 +30,7 @@ HWY_API auto prism_print_debug() -> bool {
   return static_cast<bool>(_print_debug);
 }
 
-HWY_API void debug_msg(const char *msg) {
+HWY_API auto debug_msg(const char *msg) -> void {
   if (not prism_print_debug()) {
     return;
   }
@@ -35,17 +38,17 @@ HWY_API void debug_msg(const char *msg) {
 }
 
 template <typename T> auto _get_format_string(const bool hex) -> const char * {
-  if constexpr (std::is_same<T, float>::value) {
+  if constexpr (std::is_same_v<T, float>) {
     return hex ? " %+.6a" : " %+.7e";
-  } else if constexpr (std::is_same<T, double>::value) {
+  } else if constexpr (std::is_same_v<T, double>) {
     return hex ? " %+.13a" : " %+.17e";
-  } else if constexpr (std::is_same<T, std::int32_t>::value) {
+  } else if constexpr (std::is_same_v<T, std::int32_t>) {
     return hex ? " %08x" : " %d";
-  } else if constexpr (std::is_same<T, std::uint32_t>::value) {
+  } else if constexpr (std::is_same_v<T, std::uint32_t>) {
     return hex ? " %08x" : " %u";
-  } else if constexpr (std::is_same<T, std::int64_t>::value) {
+  } else if constexpr (std::is_same_v<T, std::int64_t>) {
     return hex ? " %016llx" : " %lld";
-  } else if constexpr (std::is_same<T, std::uint64_t>::value) {
+  } else if constexpr (std::is_same_v<T, std::uint64_t>) {
     return hex ? " %016llx" : " %llu";
   } else {
     return ""; // Default case

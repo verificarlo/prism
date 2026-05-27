@@ -5,11 +5,10 @@
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
-#include <unistd.h>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
-#include <type_traits>
+#include <unistd.h>
 
 #if defined(PRISM_SR_SCALAR_INL_H) == defined(HWY_TARGET_TOGGLE)
 #ifdef PRISM_SR_SCALAR_INL_H
@@ -38,7 +37,7 @@ template <typename T> auto isnumber(const T a, const T b) -> bool {
   const U b_uint = b_bits.u;
 
   const int32_t t = prism::sr::get_virtual_precision<T>();
-  bool ret;
+  bool ret = false;
   if ((t - 1) < mantissa) {
     // At reduced virtual precision, zero operands can produce results
     // that need rounding. Only reject inf/nan.
@@ -87,8 +86,7 @@ template <typename T> auto isnumber(const T a, const T b) -> bool {
 //    (rho - pi) + tau can be inexact but we are only interested in its sign
 //    and IEEE-754 guarantees monotonic rounding.
 // ------------------------------------------------------------------------
-template <typename T>
-inline auto round(const T sigma, const T tau) -> T {
+template <typename T> inline auto round(const T sigma, const T tau) -> T {
   const int32_t t = prism::sr::get_virtual_precision<T>();
   using prism::utils::get_exponent;
   using prism::utils::get_predecessor_abs;

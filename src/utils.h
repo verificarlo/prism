@@ -1,10 +1,10 @@
 #ifndef __PRISM_UTILS_H__
 #define __PRISM_UTILS_H__
 
-#include <cstdint>
 #include <cassert>
+#include <cstdint>
 #include <cstring>
-#include <string>
+#include <type_traits>
 
 #include "src/debug.h"
 
@@ -170,19 +170,22 @@ template <typename T> inline auto pow2(int n) -> T {
   return res;
 }
 
-// TODO(yohan): finish to implement this function, bug in rounding logic
-template <typename T> auto add_round_odd(T a, T b) -> T {
+template <typename T> inline auto add_round_odd(T a, T b) -> T {
   // return addition with rounding to odd
   // https://www.lri.fr/~melquion/doc/08-tc.pdf
   T x;
   T e;
-  twosum(a, b, &x, &e);
-  union {
-    T value;
-    typename IEEE754<T>::U bits;
-  } u;
-  u.value = x;
-  return (e == 0 || (u.bits & 1)) ? x : x + 1;
+  twosum(a, b, x, e);
+  using U = typename IEEE754<T>::U;
+  U bits;
+  std::memcpy(&bits, &x, sizeof(T));
+  if (e == 0 || (bits & 1)) {
+    return x;
+  }
+
+  bits += ((x < 0) == (e < 0)) ? 1 : static_cast<U>(-1);
+  std::memcpy(&x, &bits, sizeof(T));
+  return x;
 }
 
 auto predecessor_float(float a) -> float;
@@ -197,46 +200,59 @@ auto pow2_double(int64_t n) -> double;
 } // namespace prism::utils
 
 namespace prism::sr {
-  // Configurable virtual precision, default to hardware precision.
-  inline thread_local int32_t virtual_precision_f32 = 24;
-  inline thread_local int32_t virtual_precision_f64 = 53;
+// Configurable virtual precision, default to hardware precision.
+// NOLINT
+inline thread_local int32_t virtual_precision_f32 = // NOLINT
+    utils::IEEE754<float>::precision;
+inline thread_local int32_t virtual_precision_f64 = // NOLINT
+    utils::IEEE754<double>::precision;
 
-  template <typename T>
-  inline int32_t get_virtual_precision() {
-    if constexpr (sizeof(T) == 4) return virtual_precision_f32;
-    else return virtual_precision_f64;
+template <typename T> inline auto get_virtual_precision() -> int32_t {
+  if constexpr (std::is_same_v<T, float>) {
+    return virtual_precision_f32;
+  } else if constexpr (std::is_same_v<T, double>) {
+    return virtual_precision_f64;
+  } else {
+    static_assert(!sizeof(T), "get_virtual_precision: unsupported type");
+  }
+}
+
+template <typename T> inline void set_virtual_precision(int32_t t) {
+  constexpr int32_t precision = prism::utils::IEEE754<T>::mantissa + 1;
+  assert(t >= 2 && t <= precision);
+
+  if constexpr (std::is_same_v<T, float>) {
+    virtual_precision_f32 = t;
+  } else if constexpr (std::is_same_v<T, double>) {
+    virtual_precision_f64 = t;
+  } else {
+    static_assert(!sizeof(T), "set_virtual_precision: unsupported type");
+  }
+}
+
+// Helper to mask off the lower bits of the mantissa to match a virtual
+// precision t
+template <typename T>
+inline auto truncate_mantissa(const T val, const int32_t t) -> T {
+  constexpr int32_t mantissa = prism::utils::IEEE754<T>::mantissa;
+
+  // If virtual precision meets or exceeds hardware, no truncation needed
+  if (t >= mantissa + 1) {
+    return val;
   }
 
-  template <typename T>
-  inline void set_virtual_precision(int32_t t) {
-    constexpr int32_t precision = prism::utils::IEEE754<T>::mantissa + 1;
-    assert(t >= 2 && t <= precision);
+  using UintT = typename prism::utils::IEEE754<T>::U;
+  UintT bits;
+  std::memcpy(&bits, &val, sizeof(T));
 
-    if constexpr (sizeof(T) == 4) virtual_precision_f32 = t;
-    else virtual_precision_f64 = t;
-  }
+  const int32_t shift = mantissa - (t - 1);
+  const UintT mask = ~((static_cast<UintT>(1) << shift) - 1);
+  bits &= mask;
 
-  // Helper to mask off the lower bits of the mantissa to match a virtual precision t
-  template <typename T>
-  inline auto truncate_mantissa(const T val, const int32_t t) -> T {
-    constexpr int32_t mantissa = prism::utils::IEEE754<T>::mantissa;
-
-    // If virtual precision meets or exceeds hardware, no truncation needed
-    if (t >= mantissa + 1) return val;
-
-    // Use appropriate unsigned integer type for bit manipulation
-    using UintT = std::conditional_t<sizeof(T) == 8, uint64_t, uint32_t>;
-    UintT bits;
-    std::memcpy(&bits, &val, sizeof(T));
-
-    const int32_t shift = mantissa - (t - 1);
-    const UintT mask = ~((static_cast<UintT>(1) << shift) - 1);
-    bits &= mask;
-
-    T res;
-    std::memcpy(&res, &bits, sizeof(T));
-    return res;
-  }
+  T res;
+  std::memcpy(&res, &bits, sizeof(T));
+  return res;
+}
 } // namespace prism::sr
 
 #endif // __PRISM_UTILS_H__
