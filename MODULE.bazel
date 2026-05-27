@@ -31,12 +31,12 @@ http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "ht
 
 # Use my version of highway with Print format option
 # Command to generate integrity:
-# > openssl dgst -sha256 -binary highway-1.2.0-a.zip | openssl base64 -A | sed 's/^/sha256-/'
+# > openssl dgst -sha256 -binary 1.4.0.zip | openssl base64 -A | sed 's/^/sha256-/'
 http_archive(
     name = "hwy",
-    urls = ["https://github.com/yohanchatelain/highway/archive/refs/tags/1.2.0-a.zip"],
-    integrity = "sha256-499xcu9XniKcTnqNvld9aIgYJEDgRse+ga+f389Wayw=",
-    strip_prefix = "highway-1.2.0-a",
+    integrity = "sha256-mpMbzHLO62Vm+BPQ5oxE7nELljiJmh/rJZG/fNP7zLM=",
+    strip_prefix = "highway-1.4.0",
+    urls = ["https://github.com/yohanchatelain/highway/archive/refs/tags/1.4.0.zip"],
 )
 
 # Boost
@@ -46,8 +46,8 @@ http_archive(
 bazel_dep(name = "rules_boost", repo_name = "com_github_nelhage_rules_boost")
 archive_override(
     module_name = "rules_boost",
-    urls = ["https://github.com/nelhage/rules_boost/archive/refs/heads/master.tar.gz"],
     strip_prefix = "rules_boost-master",
+    urls = ["https://github.com/nelhage/rules_boost/archive/refs/heads/master.tar.gz"],
     # It is recommended to edit the above URL and the below sha256 to point to a specific version of this repository.
     # integrity = "sha256-...",
 )
