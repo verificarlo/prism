@@ -8,6 +8,22 @@ AC_CONFIG_AUX_DIR(autoconf)
 AC_CONFIG_HEADERS([config.h])
 AM_INIT_AUTOMAKE([silent-rules foreign])
 
+dnl Prefer LLVM toolchain compilers when available
+if test -n "$LLVM_PATH"; then
+  prism_llvm_tool_path="$LLVM_PATH/bin$PATH_SEPARATOR$PATH"
+else
+  prism_llvm_tool_path="$PATH"
+fi
+AC_PATH_PROG([LLVM_CLANG], [clang], [], [$prism_llvm_tool_path])
+AC_PATH_PROG([LLVM_CLANGXX], [clang++], [], [$prism_llvm_tool_path])
+
+if test -n "$LLVM_CLANG"; then
+  CC="$LLVM_CLANG"
+fi
+if test -n "$LLVM_CLANGXX"; then
+  CXX="$LLVM_CLANGXX"
+fi
+
 LT_INIT
 AC_PROG_CXX
 AC_PROG_AWK
@@ -17,6 +33,7 @@ AC_PROG_LN_S
 AC_PROG_MAKE_SET
 
 AX_LLVM([4.0],[20.1.8],[all])
+
 AC_SUBST(LLVM_CPPFLAGS, $LLVM_CPPFLAGS)
 AC_SUBST(LLVM_LDFLAGS, $LLVM_LDFLAGS)
 AC_SUBST(LLVM_VERSION_MAJOR, $LLVM_VERSION_MAJOR)
