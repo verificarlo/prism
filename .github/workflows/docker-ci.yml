@@ -65,13 +65,9 @@ jobs:
       - name: Set up environment
         run: |
           sudo apt-get update
-            sudo apt-get install -y wget
-            if [ "${{ runner.arch }}" = "X64" ]; then
-              wget http://security.debian.org/debian-security/pool/updates/main/n/ncurses/libtinfo5_6.1+20181013-2+deb10u5_amd64.deb
-            elif [ "${{ runner.arch }}" = "ARM64" ]; then
-              wget http://security.debian.org/debian-security/pool/updates/main/n/ncurses/libtinfo5_6.1+20181013-2+deb10u5_arm64.deb
-            fi
-          sudo dpkg -i libtinfo5_6.1+20181013-2+deb10u5_amd64.deb
+          sudo apt-get install -y wget
+          wget http://ftp.us.debian.org/debian/pool/main/n/ncurses/libtinfo5_6.4-4_amd64.deb
+          sudo dpkg -i libtinfo5_6.4-4_amd64.deb
       - name: autogenerate
         run: ./autogen.sh
       - name: configure
