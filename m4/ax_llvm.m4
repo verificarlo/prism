@@ -91,8 +91,8 @@ AC_DEFUN([AX_LLVM],
     # LLVM >= 19 static archives may use a format (e.g. LTO bitcode) that GNU ld
     # cannot parse.  Use lld from the LLVM toolchain when available so both the
     # configure link-test and the actual build succeed.
-    if test -x "$LLVM_BINDIR/lld"; then
-      LLVM_LDFLAGS="$LLVM_LDFLAGS -fuse-ld=$LLVM_BINDIR/lld"
+    if test -x "$LLVM_BINDIR/ld.lld"; then
+      LLVM_LDFLAGS="$LLVM_LDFLAGS -fuse-ld=$LLVM_BINDIR/ld.lld"
     fi
   fi
   LLVM_LIBDIR=`$LLVM_CONFIG --libdir`
