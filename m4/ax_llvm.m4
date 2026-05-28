@@ -85,7 +85,10 @@ AC_DEFUN([AX_LLVM],
   LLVM_CPPFLAGS=`$LLVM_CONFIG --cxxflags | sed s/-Wcovered-switch-default// | sed s/-Werror=date-time// | sed s/-Werror=unguarded-availability-new// | sed s/-Wl,--no-keep-files-mapped// | sed s/-Wstring-conversion//`
   AC_DEFINE_UNQUOTED([LLVM_CPPFLAGS], ["$LLVM_CPPFLAGS"], [The llvm CPPFLAGS])
   LLVM_LDFLAGS="`$LLVM_CONFIG --ldflags` `$LLVM_CONFIG --system-libs`"
-  LLVM_LIBS=`$LLVM_CONFIG --libs $3`
+  LLVM_LIBS=`$LLVM_CONFIG --link-shared --libs $3 2>/dev/null`
+  if test -z "$LLVM_LIBS"; then
+    LLVM_LIBS=`$LLVM_CONFIG --libs $3`
+  fi
   LLVM_LIBDIR=`$LLVM_CONFIG --libdir`
 
   # The output of `llvm-config --system-libs/--ldflags' often contains library directives
