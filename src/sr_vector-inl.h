@@ -28,8 +28,7 @@ namespace dbg = prism::vector::HWY_NAMESPACE;
 namespace rng = prism::vector::xoshiro::HWY_NAMESPACE;
 
 template <class D, class V = hn::VFromD<D>, typename T = hn::TFromD<D>>
-HWY_INLINE void fasttwosum(const D d, const V a, const V b, V &sigma,
-                           V &tau) {
+HWY_INLINE void fasttwosum(const D d, const V a, const V b, V &sigma, V &tau) {
   dbg::debug_msg("\n[twosum] START");
   dbg::debug_vec(d, "[twosum] a", a);
   dbg::debug_vec(d, "[twosum] b", b);
@@ -326,8 +325,8 @@ HWY_FLATTEN void twoprodfma(const D d, V a, V b, V &sigma, V &tau) {
 #if defined(HWY_COMPILE_ONLY_STATIC) or defined(WARN_FMA_EMULATION)
 #warning "FMA not supported, using emulation (slow)"
 #endif
-  const auto hn = hn::Neg(sigma);
-  tau = fma_emul(d, a, b, hn);
+  const auto neg_sigma = hn::Neg(sigma);
+  tau = fma_emul(d, a, b, neg_sigma);
 #endif
 
   dbg::debug_vec(d, "[twoprodfma] sigma", sigma);
@@ -377,9 +376,9 @@ HWY_INLINE auto get_exponent(const D d, const V a) -> VI {
   dbg::debug_vec(di, "[get_exponent] raw_exp", raw_exp);
   dbg::debug_vec(di, "[get_exponent] exp", exp, false);
 
-
   const auto raw_exp_is_zero = hn::Eq(raw_exp, hn::Zero(di));
-  const auto min_exponent_v = hn::Set(di, prism::utils::IEEE754<T>::min_exponent);
+  const auto min_exponent_v =
+      hn::Set(di, prism::utils::IEEE754<T>::min_exponent);
   const auto exp_clamped = hn::IfThenElse(raw_exp_is_zero, min_exponent_v, exp);
 
   dbg::debug_vec(di, "[get_exponent] res", exp_clamped, false);
@@ -403,8 +402,7 @@ HWY_FLATTEN auto FastPow2I(D d, VI x) -> hn::Vec<D> {
 }
 
 // Lookup table for common power-of-2 values
-template <typename T>
-struct Pow2LookupTable {
+template <typename T> struct Pow2LookupTable {
   static constexpr size_t kTableSize = 64;
   static constexpr int kMinExp = -32;
   static constexpr int kMaxExp = 31;
@@ -424,8 +422,8 @@ HWY_INLINE auto pow2(const D d, const VI n) -> hn::VFromD<D> {
   constexpr I mantissa = prism::utils::IEEE754<T>::mantissa;
   constexpr I min_exponent = prism::utils::IEEE754<T>::min_exponent;
 
-  // Fast path: check if we can use lookup table (framework for future optimization)
-  // For now, use the original computation path for all values
+  // Fast path: check if we can use lookup table (framework for future
+  // optimization) For now, use the original computation path for all values
 
   // is_subnormal = n < min_exponent
   const auto min_exponent_v = hn::Set(di, min_exponent);
@@ -474,7 +472,8 @@ HWY_INLINE auto truncate_mantissa(const D d, const V val) -> V {
   const int32_t t = prism::sr::get_virtual_precision<T>();
   constexpr int32_t mantissa = prism::utils::IEEE754<T>::mantissa;
 
-  if (HWY_UNLIKELY((t - 1) >= mantissa)) return val;
+  if (HWY_UNLIKELY((t - 1) >= mantissa))
+    return val;
 
   using DU = hn::RebindToUnsigned<D>;
   const DU du{};
@@ -547,9 +546,8 @@ HWY_FLATTEN auto round(const D d, const V sigma, const V tau) -> V {
   // sign_delta = sign(tau) if rho == 0 else sign(rho)
   const auto tau_lt_zero = hn::Lt(tau, zero);
   const auto rho_lt_zero = hn::Lt(rho, zero);
-  const auto sign_delta = hn::Or(
-      hn::And(rho_is_zero, tau_lt_zero),
-      hn::And(hn::Not(rho_is_zero), rho_lt_zero));
+  const auto sign_delta = hn::Or(hn::And(rho_is_zero, tau_lt_zero),
+                                 hn::And(hn::Not(rho_is_zero), rho_lt_zero));
 
   // sign_dir = -1 if sign_delta else 1
   const auto sign_dir = hn::IfThenElse(sign_delta, neg_one, one);
@@ -595,7 +593,7 @@ HWY_FLATTEN auto round(const D d, const V sigma, const V tau) -> V {
   dbg::debug_vec(di, "[sr_round] η", eta, false);
 
   // Compute ulp at precision t
-  const auto t_v = hn::Set(di, (t-1));
+  const auto t_v = hn::Set(di, (t - 1));
   const auto exp = hn::Sub(eta, t_v);
   const auto abs_ulp_t = pow2(d, exp);
 
@@ -609,9 +607,8 @@ HWY_FLATTEN auto round(const D d, const V sigma, const V tau) -> V {
   constexpr int32_t min_exp = prism::utils::IEEE754<T>::min_exponent;
   const auto min_exp_v = hn::Set(di, min_exp);
   const auto is_min_exp = hn::Le(hn::Sub(eta, t_v), min_exp_v);
-  const auto scale =
-      hn::IfThenElse(hn::RebindMask(d, is_min_exp),
-                     hn::Set(d, prism::utils::pow2<T>(64)), one);
+  const auto scale = hn::IfThenElse(hn::RebindMask(d, is_min_exp),
+                                    hn::Set(d, prism::utils::pow2<T>(64)), one);
   const auto sc_rho = hn::Mul(rho, scale);
   const auto sc_tau = hn::Mul(tau, scale);
   const auto sc_ulp = hn::Mul(ulp_t, scale);

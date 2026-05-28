@@ -1,7 +1,0 @@
-Checks: '*,-objc-*,-darwin-*,-llvmlibc-*,-android-*,-fuchsia-*,-altera-*,-readability-identifier-length,-pp_including_mainfile_in_preamble'
-ExtraArgs: ['-DPRISM_DEBUG', '-I/home/yohan/Work/prism','-I/home/yohan/snap/alacritty/common/.cache/bazel/_bazel_yohan/81fa93a9ef3bcfde498871c750052c53/execroot/_main/external/googletest+/googlemock/include/']
-ExtraArgsBefore: ['-DPRISM_DEBUG', '-I/home/yohan/Work/prism','-I/home/yohan/snap/alacritty/common/.cache/bazel/_bazel_yohan/81fa93a9ef3bcfde498871c750052c53/execroot/_main/external/googletest+/googlemock/include/']
-WarningsAsErrors: ''
-HeaderFilterRegex: '^(?!.*hwy/foreach_target\.h).*'
-FormatStyle: llvm
-User: yohan

@@ -8,7 +8,7 @@
 # MODULE.bazel
 module(
     name = "prism",
-    version = "0.0.4",
+    version = "0.0.5",
 )
 
 # Choose the most recent version available at

@@ -1,3 +1,4 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("//:constants.bzl", "COPTS", "DEBUG_COPTS", "DYNAMIC_COPTS", "RANDOM_FULLBITS_COPTS", "RANDOM_PARTIALBITS_COPTS", "STATIC_COPTS")
 
 exports_files([
@@ -20,7 +21,6 @@ exports_files([
     "ud_vector-inl.h",
     "ud_vector_static.cpp",
     "ud_vector_dynamic.cpp",
-    "generic_vector_dynamic-inl.h",
     "utils.h",
     "xoshiro.h",
     "xoshiro_vector.cpp",
