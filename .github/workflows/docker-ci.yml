@@ -17,7 +17,7 @@ jobs:
       - name: Install LLVM
         uses: KyleMayes/install-llvm-action@v2.0.9
         with:
-          version: "20"
+          version: "18"
       - name: Install Bazelisk
         uses: bazelbuild/setup-bazelisk@v3
       - name: Set up environment
