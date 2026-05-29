@@ -200,12 +200,17 @@ auto pow2_double(int64_t n) -> double;
 } // namespace prism::utils
 
 namespace prism::sr {
+// Process-wide defaults, set once before main() by vfcwrapper init.
+// Thread-local vars initialize from these so every new thread inherits them.
+inline int32_t default_virtual_precision_f32 = utils::IEEE754<float>::precision;
+inline int32_t default_virtual_precision_f64 = utils::IEEE754<double>::precision;
+
 // Configurable virtual precision, default to hardware precision.
 // NOLINT
 inline thread_local int32_t virtual_precision_f32 = // NOLINT
-    utils::IEEE754<float>::precision;
+    default_virtual_precision_f32;
 inline thread_local int32_t virtual_precision_f64 = // NOLINT
-    utils::IEEE754<double>::precision;
+    default_virtual_precision_f64;
 
 template <typename T> inline auto get_virtual_precision() -> int32_t {
   if constexpr (std::is_same_v<T, float>) {
