@@ -6,7 +6,7 @@
 #include <cstring>
 #include <type_traits>
 
-#include "src/debug.h"
+#include "debug.h"
 
 #ifdef __clang__
 using Float128 = __float128;
@@ -203,7 +203,8 @@ namespace prism::sr {
 // Process-wide defaults, set once before main() by vfcwrapper init.
 // Thread-local vars initialize from these so every new thread inherits them.
 inline int32_t default_virtual_precision_f32 = utils::IEEE754<float>::precision;
-inline int32_t default_virtual_precision_f64 = utils::IEEE754<double>::precision;
+inline int32_t default_virtual_precision_f64 =
+    utils::IEEE754<double>::precision;
 
 // Configurable virtual precision, default to hardware precision.
 // NOLINT

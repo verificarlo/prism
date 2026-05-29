@@ -66,6 +66,17 @@ cc_test_lib_gen(
     dbg = True,
 )
 
+cc_test_lib_gen(
+    name = "seed-api",
+    size = "small",
+    src = [
+        "//src:srcs-xoshiro",
+        "//src:prism_api.h",
+        "//tests/vector:test_seed_api.cpp",
+    ],
+    mode = "dynamic",
+)
+
 # Stochastic rounding library tests
 
 cc_test_lib_gen(
@@ -206,6 +217,7 @@ cc_test_lib_gen(
 test_suite(
     name = "all",
     tests = [
+        ":seed-api",
         ":sr-accuracy",
         ":sr-perf-dynamic",
         ":sr-perf-static",

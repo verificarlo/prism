@@ -3,6 +3,7 @@ load("//:constants.bzl", "COPTS", "DEBUG_COPTS", "DYNAMIC_COPTS", "RANDOM_FULLBI
 
 exports_files([
     "prism_api.cpp",
+    "prism_api.h",
     "debug.h",
     "debug_vector-inl.h",
     "eft.h",

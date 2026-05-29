@@ -10,30 +10,26 @@
  *                                                                           *\
  ****************************************************************************/
 
-#include "prism_api.h"
-#include "utils.h"
-#include "xoshiro.h"
+#ifndef __PRISM_API_H__
+#define __PRISM_API_H__
 
+#include <stdint.h>
+
+#ifdef __cplusplus
 extern "C" {
+#endif
 
-void interflop_prism_set_default_virtual_precision_binary32(int32_t t) {
-  prism::sr::default_virtual_precision_f32 = t;
-}
+void interflop_prism_set_default_virtual_precision_binary32(int32_t t);
+void interflop_prism_set_default_virtual_precision_binary64(int32_t t);
 
-void interflop_prism_set_default_virtual_precision_binary64(int32_t t) {
-  prism::sr::default_virtual_precision_f64 = t;
-}
+int32_t interflop_prism_get_default_virtual_precision_binary32(void);
+int32_t interflop_prism_get_default_virtual_precision_binary64(void);
 
-int32_t interflop_prism_get_default_virtual_precision_binary32(void) {
-  return prism::sr::default_virtual_precision_f32;
-}
+uint64_t interflop_prism_get_seed(void);
+void interflop_prism_set_seed(uint64_t seed);
 
-int32_t interflop_prism_get_default_virtual_precision_binary64(void) {
-  return prism::sr::default_virtual_precision_f64;
-}
-
-uint64_t interflop_prism_get_seed(void) { return get_user_seed(); }
-
-void interflop_prism_set_seed(uint64_t seed) { set_user_seed(seed); }
-
+#ifdef __cplusplus
 } // extern "C"
+#endif
+
+#endif // __PRISM_API_H__

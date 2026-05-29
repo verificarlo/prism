@@ -28,6 +28,19 @@ cc_test_gen_scalar(
 # Stochastic Rounding rounding mode
 
 cc_test_lib_gen(
+    name = "seed-api",
+    src = [
+        ":test_seed_api.cpp",
+        "//src:prism_api.h",
+        "//src:xoshiro.h",
+        "//src:random-inl.h",
+        "//src:target_utils.h",
+        "//src:debug_vector-inl.h",
+    ],
+    mode = "dynamic",
+)
+
+cc_test_lib_gen(
     name = "sr-accuracy",
     size = "medium",
     src = [
@@ -111,6 +124,7 @@ cc_test_binary(
 test_suite(
     name = "all",
     tests = [
+        ":seed-api",
         ":sr-accuracy",
         ":test_get_exponent",
         ":test_get_pow2",

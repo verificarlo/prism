@@ -3,18 +3,20 @@
 
 #include <random>
 
-__attribute__((unused)) static auto get_user_seed() -> uint64_t {
+// inline with external linkage: static locals are shared across all TUs.
+inline auto seed_state(bool set = false, uint64_t new_seed = 0) -> uint64_t {
   static bool initialized = false;
   static uint64_t seed = 0;
-  if (not initialized) {
-    const char *seed_env_str = "PRISM_SEED";
-    const char *seed_str = getenv(seed_env_str);
+  if (set) {
+    seed = new_seed;
+    initialized = true;
+  } else if (not initialized) {
+    const char *seed_str = getenv("PRISM_SEED");
     if (seed_str != nullptr) {
       char *endptr = nullptr;
       seed = strtoll(seed_str, &endptr, 10);
       if (*endptr != '\0') {
-        // Handle conversion error
-        seed = 0; // or some default value
+        seed = 0;
       }
     } else {
       std::random_device rd;
@@ -23,6 +25,14 @@ __attribute__((unused)) static auto get_user_seed() -> uint64_t {
     initialized = true;
   }
   return seed;
+}
+
+__attribute__((unused)) inline auto get_user_seed() -> uint64_t {
+  return seed_state();
+}
+
+__attribute__((unused)) inline auto set_user_seed(uint64_t seed) -> void {
+  seed_state(true, seed);
 }
 
 #endif // __PRISM_XOSHIRO_H__
