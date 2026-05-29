@@ -17,7 +17,9 @@ bazel-bin/prism-static.ll:
 
 include_HEADERS= \
 	bazel-bin/prism-dynamic.ll \
-	bazel-bin/prism-static.ll
+	bazel-bin/prism-static.ll \
+	src/prism_api.h \
+	src/prism.h
 
 EXTRA_DIST = \
 	bazel-bin/external/+_repo_rules+hwy/libhwy.so \
