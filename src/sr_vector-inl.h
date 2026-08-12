@@ -604,7 +604,7 @@ HWY_FLATTEN auto round(const D d, const V sigma, const V tau) -> V {
   // In SR mode, z is a random sample from Uniform(0, 1).
   // In RN mode, z = 0.5 gives untied round-to-nearest (ties away from zero).
   V z;
-  if (prism::sr::rounding_mode == prism::sr::PRISM_RN) {
+  if (prism::sr::get_rounding_mode() == prism::sr::PRISM_RN) {
     z = hn::Set(d, T{0.5});
   } else {
     const auto z_rng = rng::uniform(T{});

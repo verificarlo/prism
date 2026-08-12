@@ -1,6 +1,7 @@
 #ifndef __PRISM_UTILS_H__
 #define __PRISM_UTILS_H__
 
+#include <atomic>
 #include <cassert>
 #include <cstdint>
 #include <cstring>
@@ -202,24 +203,60 @@ namespace prism::sr {
 constexpr int32_t PRISM_SR = 0; // Stochastic Rounding
 constexpr int32_t PRISM_RN = 1; // Round-to-Nearest (untied, ties away from zero)
 
-// Process-wide defaults, set once before main() by vfcwrapper init.
-// Thread-local vars initialize from these so every new thread inherits them.
-inline int32_t default_virtual_precision_f32 = utils::IEEE754<float>::precision;
-inline int32_t default_virtual_precision_f64 =
-    utils::IEEE754<double>::precision;
-inline int32_t default_rounding_mode = PRISM_SR;
+// Process-wide configuration.
+//
+// Virtual precision and rounding mode are kept thread-locally so that threads
+// may round independently, but they are *set* process-wide: a caller changing
+// precision between two phases of a computation means it for every thread, not
+// only its own. A thread cannot be written to from outside, so the two are
+// reconciled by an epoch. Every process-wide setter publishes new defaults and
+// bumps the epoch; a thread compares the epoch against the one it last observed
+// and refreshes its copy when they differ. The check costs one relaxed load per
+// kernel invocation -- get_virtual_precision() and get_rounding_mode() are
+// called once per operation, not once per element.
+//
+// Without this, a setter is a silent no-op for any thread that has already
+// executed instrumented arithmetic: the thread copied the default on first use
+// and never looks at it again, while the getter keeps reporting the new value.
+inline std::atomic<int32_t> default_virtual_precision_f32{
+    utils::IEEE754<float>::precision};
+inline std::atomic<int32_t> default_virtual_precision_f64{
+    utils::IEEE754<double>::precision};
+inline std::atomic<int32_t> default_rounding_mode{PRISM_SR};
 
-// Configurable virtual precision, default to hardware precision.
+// Bumped by every process-wide setter. Release/acquire pairing with the
+// defaults above: a thread that sees a new epoch also sees the values that
+// were published before it.
+inline std::atomic<uint32_t> config_epoch{0};
+
+// Per-thread configuration. The initializers cover threads created before the
+// first setter runs; every later change arrives through the epoch.
 inline thread_local int32_t virtual_precision_f32 =
-    default_virtual_precision_f32;
+    default_virtual_precision_f32.load(std::memory_order_relaxed);
 inline thread_local int32_t virtual_precision_f64 =
-    default_virtual_precision_f64;
-
-// Configurable rounding mode, default to SR
+    default_virtual_precision_f64.load(std::memory_order_relaxed);
 inline thread_local int32_t rounding_mode =
-    default_rounding_mode;
+    default_rounding_mode.load(std::memory_order_relaxed);
+inline thread_local uint32_t observed_epoch = 0;
+
+// Adopts the process-wide configuration if it changed since this thread last
+// looked. All three settings refresh together, so a kernel cannot mix a
+// precision from one epoch with a rounding mode from another.
+inline void refresh_thread_config() {
+  const uint32_t epoch = config_epoch.load(std::memory_order_acquire);
+  if (epoch == observed_epoch) {
+    return;
+  }
+  virtual_precision_f32 =
+      default_virtual_precision_f32.load(std::memory_order_relaxed);
+  virtual_precision_f64 =
+      default_virtual_precision_f64.load(std::memory_order_relaxed);
+  rounding_mode = default_rounding_mode.load(std::memory_order_relaxed);
+  observed_epoch = epoch;
+}
 
 template <typename T> inline auto get_virtual_precision() -> int32_t {
+  refresh_thread_config();
   if constexpr (std::is_same_v<T, float>) {
     return virtual_precision_f32;
   } else if constexpr (std::is_same_v<T, double>) {
@@ -229,10 +266,18 @@ template <typename T> inline auto get_virtual_precision() -> int32_t {
   }
 }
 
+inline auto get_rounding_mode() -> int32_t {
+  refresh_thread_config();
+  return rounding_mode;
+}
+
+// Thread-local override. Stamps the current epoch so the value survives until
+// the next process-wide setter, which discards it.
 template <typename T> inline void set_virtual_precision(int32_t t) {
   constexpr int32_t precision = prism::utils::IEEE754<T>::mantissa + 1;
   assert(t >= 2 && t <= precision);
 
+  refresh_thread_config();
   if constexpr (std::is_same_v<T, float>) {
     virtual_precision_f32 = t;
   } else if constexpr (std::is_same_v<T, double>) {
@@ -242,11 +287,32 @@ template <typename T> inline void set_virtual_precision(int32_t t) {
   }
 }
 
-inline auto get_rounding_mode() -> int32_t { return rounding_mode; }
-
 inline void set_rounding_mode(int32_t mode) {
   assert(mode == PRISM_SR || mode == PRISM_RN);
+  refresh_thread_config();
   rounding_mode = mode;
+}
+
+// Process-wide setters. Publish the new value, then bump the epoch so every
+// other thread picks it up on its next operation.
+template <typename T> inline void set_default_virtual_precision(int32_t t) {
+  constexpr int32_t precision = prism::utils::IEEE754<T>::mantissa + 1;
+  assert(t >= 2 && t <= precision);
+
+  if constexpr (std::is_same_v<T, float>) {
+    default_virtual_precision_f32.store(t, std::memory_order_relaxed);
+  } else if constexpr (std::is_same_v<T, double>) {
+    default_virtual_precision_f64.store(t, std::memory_order_relaxed);
+  } else {
+    static_assert(!sizeof(T), "set_default_virtual_precision: unsupported type");
+  }
+  config_epoch.fetch_add(1, std::memory_order_release);
+}
+
+inline void set_default_rounding_mode(int32_t mode) {
+  assert(mode == PRISM_SR || mode == PRISM_RN);
+  default_rounding_mode.store(mode, std::memory_order_relaxed);
+  config_epoch.fetch_add(1, std::memory_order_release);
 }
 
 // Helper to mask off the lower bits of the mantissa to match a virtual

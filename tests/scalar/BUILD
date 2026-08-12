@@ -28,6 +28,11 @@ cc_test_gen_scalar(
     mode = "dynamic",
 )
 
+cc_test_gen_scalar(
+    name = "test_config_epoch",
+    mode = "dynamic",
+)
+
 # Accuracy tests
 
 # Stochastic Rounding rounding mode
@@ -137,6 +142,7 @@ test_suite(
         ":test_twoprodfma",
         ":test_twosum",
         ":test_rn_mode",
+        ":test_config_epoch",
         ":ud-accuracy",
     ],
 )
