@@ -26,7 +26,9 @@ namespace prism::sr::scalar::HWY_NAMESPACE {
 
 namespace rng = prism::scalar::xoshiro::HWY_NAMESPACE;
 
-template <typename T> auto isnumber(const T a, const T b) -> bool {
+template <typename T>
+auto isnumber(const T a, const T b,
+              const prism::sr::ConfigSnapshot &config) -> bool {
   using U = typename prism::utils::IEEE754<T>::U;
   debug_start();
   constexpr auto naninf_mask = prism::utils::IEEE754<T>::inf_nan_mask;
@@ -36,7 +38,7 @@ template <typename T> auto isnumber(const T a, const T b) -> bool {
   const U a_uint = a_bits.u;
   const U b_uint = b_bits.u;
 
-  const int32_t t = prism::sr::get_virtual_precision<T>();
+  const int32_t t = config.virtual_precision;
   bool ret = false;
   if ((t - 1) < mantissa) {
     // At reduced virtual precision, zero operands can produce results
@@ -74,8 +76,10 @@ template <typename T> auto isnumber(const T a, const T b) -> bool {
 //       https://github.com/user-attachments/files/29456845/vpsr.pdf
 //
 // ------------------------------------------------------------------------
-template <typename T> inline auto round(const T sigma, const T tau) -> T {
-  const int32_t t = prism::sr::get_virtual_precision<T>();
+template <typename T>
+inline auto round(const T sigma, const T tau,
+                  const prism::sr::ConfigSnapshot &config) -> T {
+  const int32_t t = config.virtual_precision;
   using prism::utils::get_exponent;
   using prism::utils::get_predecessor_abs;
   using prism::utils::IEEE754;
@@ -125,9 +129,8 @@ template <typename T> inline auto round(const T sigma, const T tau) -> T {
   // We sample pi in Uniform(0, sc_ulp)
   // In SR mode, z is a random sample from Uniform(0, 1).
   // In RN mode, z = 0.5 gives untied round-to-nearest (ties away from zero).
-  const T z = (prism::sr::get_rounding_mode() == prism::sr::PRISM_RN)
-                  ? T{0.5}
-                  : rng::uniform(T{});
+  const T z = (config.rounding_mode == prism::sr::PRISM_RN) ? T{0.5}
+                                                            : rng::uniform(T{});
   const T pi = sc_ulp * z;
 
   // We want to check if P < |x - trunc| where P = abs(pi).
@@ -151,15 +154,16 @@ template <typename T> inline auto round(const T sigma, const T tau) -> T {
 }
 
 template <typename T> inline auto add(const T a, const T b) -> T {
+  const auto config = prism::sr::get_config_snapshot<T>();
   debug_start();
-  if (not isnumber(a, b)) {
+  if (not isnumber(a, b, config)) {
     debug_end();
     return a + b;
   }
   T tau;
   T sigma;
   twosum(a, b, sigma, tau);
-  const T res = round(sigma, tau);
+  const T res = round(sigma, tau, config);
   debug_print("sr_add(%+.13a, %+.13a) = %+.13a\n", a, b, res);
   debug_end();
   return res;
@@ -168,22 +172,24 @@ template <typename T> inline auto add(const T a, const T b) -> T {
 template <typename T> inline auto sub(T a, T b) -> T { return add(a, -b); }
 
 template <typename T> inline auto mul(T a, T b) -> T {
+  const auto config = prism::sr::get_config_snapshot<T>();
   debug_start();
-  if (not isnumber(a, b)) {
+  if (not isnumber(a, b, config)) {
     debug_end();
     return a * b;
   }
   T tau;
   T sigma;
   twoprodfma(a, b, sigma, tau);
-  const T res = round(sigma, tau);
+  const T res = round(sigma, tau, config);
   debug_end();
   return res;
 }
 
 template <typename T> inline auto div(const T a, const T b) -> T {
+  const auto config = prism::sr::get_config_snapshot<T>();
   debug_start();
-  if (not isnumber(a, b)) {
+  if (not isnumber(a, b, config)) {
     debug_end();
     return a / b;
   }
@@ -196,20 +202,21 @@ template <typename T> inline auto div(const T a, const T b) -> T {
               a, std::fma(-sigma, b, a));
   debug_print("tau = (-%+.13a * %+.13a + %+.13a) / %+.13a\n", -sigma, b, a, b);
 
-  const T res = round(sigma, tau);
+  const T res = round(sigma, tau, config);
   debug_print("sr_div(%+.13a, %+.13a) = %+.13a\n", a, b, res);
   debug_end();
   return res;
 }
 
 template <typename T> inline auto sqrt(const T a) -> T {
+  const auto config = prism::sr::get_config_snapshot<T>();
   const T sigma = std::sqrt(a);
   if (not std::isfinite(a) or a <= 0) {
     return sigma;
   }
   const T tau_p = std::fma(-sigma, sigma, a);
   const T tau = tau_p / (2 * sigma);
-  return round(sigma, tau);
+  return round(sigma, tau, config);
 }
 
 /*
@@ -225,6 +232,7 @@ Algorithm 5 (ErrFmaNearest):
   r2 = ◦(γ + α2)
 */
 template <typename T> inline auto fma(const T a, const T b, const T c) -> T {
+  const auto config = prism::sr::get_config_snapshot<T>();
   if (not std::isfinite(a) or not std::isfinite(b) or not std::isfinite(c)) {
     return std::fma(a, b, c);
   }
@@ -244,7 +252,7 @@ template <typename T> inline auto fma(const T a, const T b, const T c) -> T {
   twosum(u1, alpha1, beta1, beta2);
   gamma = (beta1 - r1) + beta2;
   r2 = gamma + alpha2;
-  const T res = round(r1, r2);
+  const T res = round(r1, r2, config);
   debug_print("sr_fma(%+.13a, %+.13a, %+.13a) = %+.13a\n", a, b, c, res);
   debug_end();
   return res;

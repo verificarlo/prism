@@ -468,8 +468,8 @@ HWY_INLINE auto pow2(const D d, const VI n) -> hn::VFromD<D> {
 }
 
 template <class D, class V = hn::VFromD<D>, typename T = hn::TFromD<D>>
-HWY_INLINE auto truncate_mantissa(const D d, const V val) -> V {
-  const int32_t t = prism::sr::get_virtual_precision<T>();
+HWY_INLINE auto truncate_mantissa(const D d, const V val,
+                                  const int32_t t) -> V {
   constexpr int32_t mantissa = prism::utils::IEEE754<T>::mantissa;
 
   if (HWY_UNLIKELY((t - 1) >= mantissa))
@@ -506,18 +506,19 @@ HWY_INLINE auto truncate_mantissa(const D d, const V val) -> V {
 //       https://github.com/user-attachments/files/29456845/vpsr.pdf
 //
 template <class D, class V = hn::VFromD<D>, typename T = hn::TFromD<D>>
-HWY_FLATTEN auto round(const D d, const V sigma, const V tau) -> V {
+HWY_FLATTEN auto round(const D d, const V sigma, const V tau,
+                       const prism::sr::ConfigSnapshot &config) -> V {
   dbg::debug_msg("\n[sr_round] START");
   dbg::debug_vec(d, "[sr_round] σ", sigma);
   dbg::debug_vec(d, "[sr_round] τ", tau);
 
-  const int32_t t = prism::sr::get_virtual_precision<T>();
+  const int32_t t = config.virtual_precision;
   const auto zero = hn::Zero(d);
   const auto one = hn::Set(d, T{1});
   const auto neg_one = hn::Set(d, T{-1});
 
   // compute trunc_t(sigma), the truncated value at precision t
-  const auto trunc = truncate_mantissa(d, sigma);
+  const auto trunc = truncate_mantissa(d, sigma, t);
 
   // rho is the distance from sigma to trunc
   // the computation is exact in IEEE-754
@@ -604,7 +605,7 @@ HWY_FLATTEN auto round(const D d, const V sigma, const V tau) -> V {
   // In SR mode, z is a random sample from Uniform(0, 1).
   // In RN mode, z = 0.5 gives untied round-to-nearest (ties away from zero).
   V z;
-  if (prism::sr::get_rounding_mode() == prism::sr::PRISM_RN) {
+  if (config.rounding_mode == prism::sr::PRISM_RN) {
     z = hn::Set(d, T{0.5});
   } else {
     const auto z_rng = rng::uniform(T{});
@@ -636,11 +637,12 @@ HWY_FLATTEN auto round(const D d, const V sigma, const V tau) -> V {
 
 template <class D, class V = hn::VFromD<D>, typename T = hn::TFromD<D>>
 HWY_FLATTEN auto add(const D d, const V a, const V b) -> V {
+  const auto config = prism::sr::get_config_snapshot<T>();
   dbg::debug_msg("\n[sr_add] START");
   V sigma;
   V tau;
   twosum(d, a, b, sigma, tau);
-  const auto ret = round(d, sigma, tau);
+  const auto ret = round(d, sigma, tau, config);
   dbg::debug_vec(d, "[sr_add] res", ret);
   dbg::debug_msg("[sr_add] END\n");
   return ret;
@@ -657,11 +659,12 @@ HWY_FLATTEN auto sub(const D d, const V a, const V b) -> V {
 
 template <class D, class V = hn::VFromD<D>, typename T = hn::TFromD<D>>
 HWY_FLATTEN auto mul(const D d, const V a, const V b) -> V {
+  const auto config = prism::sr::get_config_snapshot<T>();
   dbg::debug_msg("\n[sr_add] START");
   V sigma;
   V tau;
   twoprodfma(d, a, b, sigma, tau);
-  const auto ret = round(d, sigma, tau);
+  const auto ret = round(d, sigma, tau, config);
   dbg::debug_vec(d, "[sr_mul] res", ret);
   dbg::debug_msg("[sr_mul] END\n");
 
@@ -684,6 +687,7 @@ the Change of the Rounding Mode
 */
 template <class D, class V = hn::VFromD<D>, typename T = hn::TFromD<D>>
 HWY_FLATTEN auto div(const D d, const V a, const V b) -> V {
+  const auto config = prism::sr::get_config_snapshot<T>();
   dbg::debug_msg("\n[sr_div] START");
   dbg::debug_vec(d, "[sr_div] a", a);
   dbg::debug_vec(d, "[sr_div] b", b);
@@ -701,7 +705,7 @@ HWY_FLATTEN auto div(const D d, const V a, const V b) -> V {
   dbg::debug_vec(d, "[sr_div] τ'", tau_p);
   const auto tau = hn::Div(tau_p, b);
   dbg::debug_vec(d, "[sr_div] τ", tau);
-  const auto ret = round(d, sigma, tau);
+  const auto ret = round(d, sigma, tau, config);
   dbg::debug_vec(d, "[sr_div] res", ret);
   dbg::debug_msg("[sr_div] END\n");
 
@@ -710,6 +714,7 @@ HWY_FLATTEN auto div(const D d, const V a, const V b) -> V {
 
 template <class D, class V = hn::VFromD<D>, typename T = hn::TFromD<D>>
 HWY_FLATTEN auto sqrt(const D d, const V a) -> V {
+  const auto config = prism::sr::get_config_snapshot<T>();
   dbg::debug_msg("\n[sr_sqrt] START");
   const auto sigma = hn::Sqrt(a);
   // -sigma * sigma + a
@@ -717,7 +722,7 @@ HWY_FLATTEN auto sqrt(const D d, const V a) -> V {
   const auto _div = hn::Div(tau_p, sigma);
   const auto half = hn::Set(d, 0.5);
   const auto tau = hn::Mul(half, _div);
-  const auto ret = round(d, sigma, tau);
+  const auto ret = round(d, sigma, tau, config);
   dbg::debug_vec(d, "[sr_sqrt] res", ret);
   dbg::debug_msg("[sr_sqrt] END\n");
 
@@ -738,6 +743,7 @@ Algorithm 5 (ErrFmaNearest):
 */
 template <class D, class V = hn::VFromD<D>, typename T = hn::TFromD<D>>
 HWY_FLATTEN auto fma(const D d, const V a, const V b, const V c) -> V {
+  const auto config = prism::sr::get_config_snapshot<T>();
   dbg::debug_msg("\n[sr_fma] START");
   dbg::debug_vec(d, "[sr_fma] a", a);
   dbg::debug_vec(d, "[sr_fma] b", b);
@@ -764,7 +770,7 @@ HWY_FLATTEN auto fma(const D d, const V a, const V b, const V c) -> V {
   const auto beta1_sub_r1 = hn::Sub(beta1, r1);
   gamma = hn::Add(beta1_sub_r1, beta2);
   r2 = hn::Add(gamma, alpha2);
-  const auto res = round(d, r1, r2);
+  const auto res = round(d, r1, r2, config);
   dbg::debug_vec(d, "[sr_fma] res", res);
   dbg::debug_msg("[sr_fma] END\n");
 

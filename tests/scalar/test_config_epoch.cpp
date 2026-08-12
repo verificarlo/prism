@@ -131,23 +131,18 @@ TEST_F(ConfigEpochTest, RoundingModeReachesARunningThread) {
   auto warmed_up_signal = warmed_up.get_future();
   auto change_signal = mode_changed.get_future();
 
-  int32_t reported = INTERFLOP_PRISM_RN;
-  bool deterministic = false;
+  int32_t kernel_mode = INTERFLOP_PRISM_SR;
+  float after = 0.0F;
 
   std::thread worker([&] {
     (void)srd::addf32(kA, kB);
     warmed_up.set_value();
 
     change_signal.wait();
-    reported = interflop_prism_get_rounding_mode();
-
-    // Under RN the threshold is fixed at one half, so repeating the same
-    // inexact operation is bit-reproducible. Under SR it would not be.
-    const float first = srd::addf32(kA, kB);
-    deterministic = true;
-    for (int i = 0; i < 64; i++) {
-      deterministic = deterministic && (srd::addf32(kA, kB) == first);
-    }
+    // Arithmetic must refresh the worker itself. Reading TLS directly after
+    // the operation avoids letting the public getter mask a stale kernel.
+    after = srd::addf32(kA, kB);
+    kernel_mode = prism::sr::rounding_mode;
   });
 
   warmed_up_signal.wait();
@@ -155,8 +150,8 @@ TEST_F(ConfigEpochTest, RoundingModeReachesARunningThread) {
   mode_changed.set_value();
   worker.join();
 
-  EXPECT_EQ(reported, INTERFLOP_PRISM_RN);
-  EXPECT_TRUE(deterministic);
+  EXPECT_EQ(kernel_mode, INTERFLOP_PRISM_RN);
+  EXPECT_EQ(after, kRoundedAt8);
 }
 
 TEST_F(ConfigEpochTest, ThreadOverrideHoldsUntilTheNextProcessWideSet) {
@@ -198,6 +193,37 @@ TEST_F(ConfigEpochTest, DefaultGetterReportsTheDefaultNotTheThreadValue) {
 
   EXPECT_EQ(interflop_prism_get_virtual_precision_binary32(), 16);
   EXPECT_EQ(interflop_prism_get_default_virtual_precision_binary32(), 16);
+}
+
+TEST_F(ConfigEpochTest, ThreadRoundingModeOverrideHoldsUntilGlobalSet) {
+  std::promise<void> override_set;
+  std::promise<void> default_changed;
+  auto override_signal = override_set.get_future();
+  auto change_signal = default_changed.get_future();
+
+  int32_t under_override = INTERFLOP_PRISM_RN;
+  int32_t after_global_set = INTERFLOP_PRISM_SR;
+
+  std::thread worker([&] {
+    interflop_prism_set_thread_rounding_mode(INTERFLOP_PRISM_SR);
+    under_override = interflop_prism_get_rounding_mode();
+    override_set.set_value();
+
+    change_signal.wait();
+    after_global_set = interflop_prism_get_rounding_mode();
+  });
+
+  override_signal.wait();
+  EXPECT_EQ(interflop_prism_get_rounding_mode(), INTERFLOP_PRISM_RN);
+
+  // Setting the existing default still advances the epoch and discards the
+  // worker's override.
+  interflop_prism_set_rounding_mode(INTERFLOP_PRISM_RN);
+  default_changed.set_value();
+  worker.join();
+
+  EXPECT_EQ(under_override, INTERFLOP_PRISM_SR);
+  EXPECT_EQ(after_global_set, INTERFLOP_PRISM_RN);
 }
 
 } // namespace

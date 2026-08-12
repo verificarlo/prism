@@ -211,9 +211,10 @@ constexpr int32_t PRISM_RN = 1; // Round-to-Nearest (untied, ties away from zero
 // only its own. A thread cannot be written to from outside, so the two are
 // reconciled by an epoch. Every process-wide setter publishes new defaults and
 // bumps the epoch; a thread compares the epoch against the one it last observed
-// and refreshes its copy when they differ. The check costs one relaxed load per
-// kernel invocation -- get_virtual_precision() and get_rounding_mode() are
-// called once per operation, not once per element.
+// and refreshes its copy when they differ. Each arithmetic operation captures
+// one configuration snapshot at entry. That snapshot costs one acquire load of
+// the epoch and keeps precision and rounding mode consistent for the full
+// operation.
 //
 // Without this, a setter is a silent no-op for any thread that has already
 // executed instrumented arithmetic: the thread copied the default on first use
@@ -253,6 +254,25 @@ inline void refresh_thread_config() {
       default_virtual_precision_f64.load(std::memory_order_relaxed);
   rounding_mode = default_rounding_mode.load(std::memory_order_relaxed);
   observed_epoch = epoch;
+}
+
+struct ConfigSnapshot {
+  int32_t virtual_precision;
+  int32_t rounding_mode;
+};
+
+// Refresh once, then copy the configuration relevant to one arithmetic
+// operation. Callers must reuse this snapshot instead of consulting TLS again
+// midway through the operation.
+template <typename T> inline auto get_config_snapshot() -> ConfigSnapshot {
+  refresh_thread_config();
+  if constexpr (std::is_same_v<T, float>) {
+    return {virtual_precision_f32, rounding_mode};
+  } else if constexpr (std::is_same_v<T, double>) {
+    return {virtual_precision_f64, rounding_mode};
+  } else {
+    static_assert(!sizeof(T), "get_config_snapshot: unsupported type");
+  }
 }
 
 template <typename T> inline auto get_virtual_precision() -> int32_t {

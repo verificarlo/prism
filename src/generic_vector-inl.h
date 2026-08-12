@@ -44,13 +44,14 @@ HWY_FLATTEN void _round(const T *HWY_RESTRICT sigma, const T *HWY_RESTRICT tau,
   using D = hn::ScalableTag<T>;
   const D d{};
   const size_t N = hn::Lanes(d);
+  const auto config = prism::sr::get_config_snapshot<T>();
 
   for (size_t i = 0; i < count; i += N) {
     const size_t remaining = count - i;
     const size_t lanes = remaining < N ? remaining : N;
     auto sigma_vec = hn::LoadN(d, sigma + i, lanes);
     auto tau_vec = hn::LoadN(d, tau + i, lanes);
-    auto res = pr::round(d, sigma_vec, tau_vec);
+    auto res = pr::round(d, sigma_vec, tau_vec, config);
     hn::StoreN(res, d, result + i, lanes);
   }
 }
