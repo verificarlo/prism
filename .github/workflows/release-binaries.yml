@@ -73,7 +73,7 @@ jobs:
           package_name="prism-${version}-linux-${PRISM_ARCH}"
           stage_root="$RUNNER_TEMP/stage"
           package_root="$RUNNER_TEMP/$package_name"
-          mkdir -p "$stage_root" "$package_root"
+          mkdir -p "$stage_root/usr/lib" "$stage_root/usr/include" "$package_root"
 
           make DESTDIR="$stage_root" install
           cp -a "$stage_root/usr/include" "$package_root/include"
