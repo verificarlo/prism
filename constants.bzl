@@ -1,6 +1,8 @@
 """
 """
 
+load("//:config.bzl", "MARCH_FLAG")
+
 # Compiler options
 
 # Slow, but full-precision random number generation.
@@ -22,8 +24,7 @@ COPTS = [
 ] + RANDOM_PARTIALBITS_COPTS
 
 NATIVE_COPTS = [
-    "-march=native",
-    "-mtune=native",
+    MARCH_FLAG,
 ]
 
 STATIC_COPTS = [

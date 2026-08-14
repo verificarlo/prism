@@ -89,20 +89,36 @@ if test -z "$BAZEL"; then
   AC_MSG_ERROR([Could not find bazel])
 fi
 
-# Checks if clang support -march=native
-AC_MSG_CHECKING([if $CLANG supports -march=native])
-doit='$CLANG -march=native -E - </dev/null >/dev/null 2>&1'
+AC_ARG_WITH(
+  [arch],
+  [AS_HELP_STRING([--with-arch=ARCH], [target CPU architecture for static dispatch (default: native)])],
+  [PRISM_ARCH="$withval"],
+  [PRISM_ARCH="native"]
+)
+
+AS_CASE(
+  ["$PRISM_ARCH"],
+  [yes|no|""], [AC_MSG_ERROR([--with-arch requires an architecture, for example x86-64-v3])]
+)
+
+AC_MSG_CHECKING([if $CLANG supports -march=$PRISM_ARCH])
+MARCH_FLAG="-march=$PRISM_ARCH"
+doit='$CLANG $MARCH_FLAG -E - </dev/null >/dev/null 2>&1'
 if AC_TRY_EVAL(doit); then
-  AC_DEFINE_UNQUOTED([MARCH_FLAG], ["-march=native"], [The -march=native flag])
-  AC_SUBST(MARCH_FLAG, "-march=native")
   AC_MSG_RESULT([yes])
 else
-  AC_DEFINE_UNQUOTED([MARCH_FLAG], ["-mtune=native"], [The -mtune=native flag])
-  AC_SUBST(MARCH_FLAG, "-mtune=native")
-  AC_MSG_RESULT([no])
+  if test "x$PRISM_ARCH" = "xnative"; then
+    MARCH_FLAG="-mtune=native"
+    AC_MSG_RESULT([no; using $MARCH_FLAG])
+  else
+    AC_MSG_RESULT([no])
+    AC_MSG_ERROR([$CLANG does not support -march=$PRISM_ARCH])
+  fi
 fi
+AC_DEFINE_UNQUOTED([MARCH_FLAG], ["$MARCH_FLAG"], [Target architecture flag])
+AC_SUBST([MARCH_FLAG])
 
-# Generate config files 
+# Generate config files
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([.bazelrc config.bzl])
 

@@ -1,4 +1,3 @@
-
 ```bash
 _|_|_|    _|_|_|    _|_|_|    _|_|_|  _|      _|
 _|    _|  _|    _|    _|    _|        _|_|  _|_|
@@ -15,7 +14,7 @@ This library provides a **vectorized implementation** of two probabilistic round
 1. **Up-Down Rounding Mode**: Add +/- 1 ulp with equal probabilities (1/2). Do not preserve exact operations.
 2. **Stochastic Rounding**: As described in [Fasi and Mikaitis: Algorithms for Stochastically Rounded Elementary Arithmetic Operations](https://ieeexplore.ieee.org/document/9387551), extended here to support the FMA operator.
 
-The library leverages the [Highway library](https://github.com/google/highway), a high-performance C++ library for portable vector instructions across platforms. It uses **dynamic dispatch** to efficiently execute functions across different architectures. 
+The library leverages the [Highway library](https://github.com/google/highway), a high-performance C++ library for portable vector instructions across platforms. It uses **dynamic dispatch** to efficiently execute functions across different architectures.
 
 ### Features
 
@@ -26,25 +25,49 @@ The library is available in three interfaces:
 
 This combination of features makes the library versatile for scientific computing, numerical analysis, and high-performance applications requiring probabilistic rounding.
 
+## Binary releases
+
+Linux x86-64 binaries are attached to each [GitHub release](https://github.com/verificarlo/prism/releases). Choose the highest architecture level supported by every machine that will run the static-dispatch library:
+
+| Archive suffix | Minimum CPU features |
+| --- | --- |
+| `x86-64` | Baseline x86-64 |
+| `x86-64-v2` | SSE3, SSSE3, SSE4.1, SSE4.2, and POPCNT |
+| `x86-64-v3` | AVX, AVX2, BMI1/2, F16C, FMA, and related features |
+| `x86-64-v4` | AVX-512 foundation and the standard v4 extensions |
+
+For example, install the baseline package for release `v0.0.7` under `/usr/local`:
+
+```bash
+curl -LO https://github.com/verificarlo/prism/releases/download/v0.0.7/prism-0.0.7-linux-x86-64.tar.gz
+sudo tar -C /usr/local --strip-components=1 -xzf prism-0.0.7-linux-x86-64.tar.gz
+sudo ldconfig
+```
+
+Each release also includes `SHA256SUMS`. The archives are built on Ubuntu 22.04 with LLVM 18 and contain shared and static libraries, public headers, and the generated LLVM IR files. The dynamic-dispatch library selects a supported vector target at runtime; the static-dispatch library requires the CPU level named by the archive.
+
 ## Requirements
 
 - clang, clang++
 - parallel ([install](https://www.gnu.org/software/parallel/))
 - **bazelisk** ([install](https://github.com/bazelbuild/bazelisk/releases))
-  
-## Install
+
+## Build and install from source
+
+The default build targets the current machine. Pass `--with-arch` to build the static-dispatch library for a specific CPU level.
 
 ```bash
-    ./autogen.sh
-    ./configure
-    make
-    make install
+./autogen.sh
+./configure                       # -march=native
+# ./configure --with-arch=x86-64-v3
+make
+make install
 ```
 
 ## Tests
 
 ```bash
-    bazel test tests:all
+bazel test tests:all
 ```
 
 ## Current status

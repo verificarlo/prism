@@ -1,0 +1,140 @@
+name: release-binaries
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/release-binaries.yml"
+      - "config.bzl.in"
+      - "configure.ac"
+      - "constants.bzl"
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: linux-${{ matrix.arch }}
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - x86-64
+          - x86-64-v2
+          - x86-64-v3
+          - x86-64-v4
+
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || github.ref }}
+
+      - name: Install LLVM
+        uses: KyleMayes/install-llvm-action@v2.0.9
+        with:
+          version: "18"
+
+      - name: Install Bazelisk
+        uses: bazelbuild/setup-bazelisk@v3
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y autoconf automake libtool parallel wget
+          wget -q http://ftp.us.debian.org/debian/pool/main/n/ncurses/libtinfo5_6.4-4_amd64.deb
+          sudo dpkg -i libtinfo5_6.4-4_amd64.deb
+
+      - name: Configure for ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          ./autogen.sh
+          ./configure --prefix=/usr --with-arch="${{ matrix.arch }}"
+
+      - name: Build
+        run: make
+
+      - name: Package binary distribution
+        env:
+          PRISM_ARCH: ${{ matrix.arch }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+
+          version="${RELEASE_TAG#v}"
+          if [ -z "$version" ]; then
+            version="$(sed -n 's/^__version__ = "\([^"]*\)"/\1/p' VERSION)"
+          fi
+
+          package_name="prism-${version}-linux-${PRISM_ARCH}"
+          stage_root="$RUNNER_TEMP/stage"
+          package_root="$RUNNER_TEMP/$package_name"
+          mkdir -p "$stage_root" "$package_root"
+
+          make DESTDIR="$stage_root" install
+          cp -a "$stage_root/usr/include" "$package_root/include"
+          cp -a "$stage_root/usr/lib" "$package_root/lib"
+
+          find bazel-bin/src -maxdepth 1 -type f -name 'libprism*.a' \
+            -exec install -m 0644 -t "$package_root/lib" {} +
+          find bazel-bin -type f -name 'libhwy.a' -print -quit | \
+            xargs -r install -m 0644 -t "$package_root/lib"
+
+          install -m 0644 LICENSE README.md "$package_root"
+          cat > "$package_root/BUILD-INFO.txt" <<EOF
+          PRISM version: $version
+          Target architecture: $PRISM_ARCH
+          Operating system: Linux
+          Build image: ubuntu-22.04
+          LLVM version: 18
+          Source revision: $GITHUB_SHA
+          EOF
+
+          test -f "$package_root/lib/libprism-dynamic.so"
+          test -f "$package_root/lib/libprism-static.so"
+          test -f "$package_root/include/prism_api.h"
+          test -f "$package_root/include/prism-dynamic.ll"
+
+          mkdir -p dist
+          tar -C "$RUNNER_TEMP" -czf "dist/${package_name}.tar.gz" "$package_name"
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: prism-linux-${{ matrix.arch }}
+          path: dist/*.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: attach-release-assets
+    if: github.event_name == 'release'
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download architecture packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: prism-linux-*
+          path: dist
+          merge-multiple: true
+
+      - name: Create checksums
+        run: |
+          cd dist
+          sha256sum ./*.tar.gz > SHA256SUMS
+
+      - name: Attach packages to the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          gh release upload "$RELEASE_TAG" dist/*.tar.gz dist/SHA256SUMS \
+            --clobber \
+            --repo "$GITHUB_REPOSITORY"
