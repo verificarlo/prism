@@ -16,11 +16,16 @@ permissions:
 
 jobs:
   build:
-    name: linux-${{ matrix.arch }}
+    name: linux-${{ matrix.arch }}-llvm${{ matrix.llvm }}
     runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
+        llvm:
+          - 17
+          - 18
+          - 19
+          - 20
         arch:
           - x86-64
           - x86-64-v2
@@ -36,7 +41,7 @@ jobs:
       - name: Install LLVM
         uses: KyleMayes/install-llvm-action@v2.0.9
         with:
-          version: "18"
+          version: ${{ matrix.llvm }}
 
       - name: Install Bazelisk
         uses: bazelbuild/setup-bazelisk@v3
@@ -45,7 +50,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y autoconf automake libtool libtinfo5 parallel
+          sudo apt-get install -y autoconf automake libtool libtinfo5 parallel patchelf
 
       - name: Configure for ${{ matrix.arch }}
         run: |
@@ -59,6 +64,7 @@ jobs:
       - name: Package binary distribution
         env:
           PRISM_ARCH: ${{ matrix.arch }}
+          PRISM_LLVM: ${{ matrix.llvm }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           set -euo pipefail
@@ -68,7 +74,7 @@ jobs:
             version="$(sed -n 's/^__version__ = "\([^"]*\)"/\1/p' VERSION)"
           fi
 
-          package_name="prism-${version}-linux-${PRISM_ARCH}"
+          package_name="prism-${version}-linux-${PRISM_ARCH}-llvm${PRISM_LLVM}"
           stage_root="$RUNNER_TEMP/stage"
           package_root="$RUNNER_TEMP/$package_name"
           mkdir -p "$stage_root/usr/lib" "$stage_root/usr/include" "$package_root"
@@ -89,13 +95,19 @@ jobs:
             install -m 0644 "$library" "$package_root/lib"
           done
 
-          install -m 0644 LICENSE README.md "$package_root"
-          cat > "$package_root/BUILD-INFO.txt" <<EOF
+          for library in "$package_root"/lib/libprism-*.so; do
+            patchelf --add-needed libhwy.so "$library"
+          done
+
+          documentation_root="$package_root/share/doc/prism"
+          mkdir -p "$documentation_root"
+          install -m 0644 LICENSE README.md "$documentation_root"
+          cat > "$documentation_root/BUILD-INFO.txt" <<EOF
           PRISM version: $version
           Target architecture: $PRISM_ARCH
           Operating system: Linux
           Build image: ubuntu-22.04
-          LLVM version: 18
+          LLVM version: $PRISM_LLVM
           Source revision: $GITHUB_SHA
           EOF
 
@@ -104,14 +116,21 @@ jobs:
           test -f "$package_root/include/prism_api.h"
           test -f "$package_root/include/prism-dynamic.ll"
           test -f "$package_root/include/prism-static.ll"
+          test -f "$documentation_root/BUILD-INFO.txt"
+
+          for library in "$package_root"/lib/libprism-*.so; do
+            LD_LIBRARY_PATH="$package_root/lib" \
+              python3 -c 'import ctypes, sys; ctypes.CDLL(sys.argv[1])' "$library"
+          done
 
           mkdir -p dist
-          tar -C "$RUNNER_TEMP" -czf "dist/${package_name}.tar.gz" "$package_name"
+          tar --owner=0 --group=0 --numeric-owner \
+            -C "$RUNNER_TEMP" -czf "dist/${package_name}.tar.gz" "$package_name"
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v4
         with:
-          name: prism-linux-${{ matrix.arch }}
+          name: prism-linux-${{ matrix.arch }}-llvm${{ matrix.llvm }}
           path: dist/*.tar.gz
           if-no-files-found: error
           retention-days: 14
