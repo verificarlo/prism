@@ -36,11 +36,12 @@ Linux x86-64 binaries are attached to each [GitHub release](https://github.com/v
 | `x86-64-v3` | AVX, AVX2, BMI1/2, F16C, FMA, and related features |
 | `x86-64-v4` | AVX-512 foundation and the standard v4 extensions |
 
-For example, install the baseline package for release `v0.0.7` under `/usr/local`:
+For example, set the desired release version and install its baseline package under `/usr/local`:
 
 ```bash
-curl -LO https://github.com/verificarlo/prism/releases/download/v0.0.7/prism-0.0.7-linux-x86-64.tar.gz
-sudo tar -C /usr/local --strip-components=1 -xzf prism-0.0.7-linux-x86-64.tar.gz
+VERSION=X.Y.Z
+curl -LO "https://github.com/verificarlo/prism/releases/download/v${VERSION}/prism-${VERSION}-linux-x86-64.tar.gz"
+sudo tar -C /usr/local --strip-components=1 -xzf "prism-${VERSION}-linux-x86-64.tar.gz"
 sudo ldconfig
 ```
 
@@ -54,11 +55,11 @@ Each release also includes `SHA256SUMS`. The archives are built on Ubuntu 22.04 
 
 ## Build and install from source
 
-The default build targets the current machine. Pass `--with-arch` to build the static-dispatch library for a specific CPU level.
+The default build requests `-march=native` and falls back to `-mtune=native` when the compiler does not support it. Pass `--with-arch` to build the static-dispatch library for a specific CPU level.
 
 ```bash
 ./autogen.sh
-./configure                       # -march=native
+./configure
 # ./configure --with-arch=x86-64-v3
 make
 make install

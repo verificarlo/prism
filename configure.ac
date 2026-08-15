@@ -98,7 +98,10 @@ AC_ARG_WITH(
 
 AS_CASE(
   ["$PRISM_ARCH"],
-  [yes|no|""], [AC_MSG_ERROR([--with-arch requires an architecture, for example x86-64-v3])]
+  [yes|no|""], [AC_MSG_ERROR([--with-arch requires an architecture, for example x86-64-v3])],
+  [-*], [AC_MSG_ERROR([--with-arch must not begin with '-'])],
+  [*[!abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._+-]*],
+    [AC_MSG_ERROR([--with-arch contains invalid characters])]
 )
 
 AC_MSG_CHECKING([if $CLANG supports -march=$PRISM_ARCH])
