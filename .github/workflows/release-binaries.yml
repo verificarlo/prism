@@ -1,15 +1,8 @@
 name: release-binaries
 
 on:
-  pull_request:
-    paths:
-      - ".github/workflows/release-binaries.yml"
-      - "config.bzl.in"
-      - "configure.ac"
-      - "constants.bzl"
   release:
     types: [published]
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -36,7 +29,7 @@ jobs:
       - name: Check out release source
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.release.tag_name || github.ref }}
+          ref: ${{ github.event.release.tag_name }}
 
       - name: Install LLVM
         uses: KyleMayes/install-llvm-action@v2.0.9
@@ -96,20 +89,20 @@ jobs:
           done
 
           for library in "$package_root"/lib/libprism-*.so; do
-            patchelf --add-needed libhwy.so "$library"
+            patchelf --add-needed libhwy.so --set-rpath '$ORIGIN' "$library"
           done
 
           documentation_root="$package_root/share/doc/prism"
           mkdir -p "$documentation_root"
           install -m 0644 LICENSE README.md "$documentation_root"
           cat > "$documentation_root/BUILD-INFO.txt" <<EOF
-          PRISM version: $version
-          Target architecture: $PRISM_ARCH
-          Operating system: Linux
-          Build image: ubuntu-22.04
-          LLVM version: $PRISM_LLVM
-          Source revision: $GITHUB_SHA
-          EOF
+PRISM version: $version
+Target architecture: $PRISM_ARCH
+Operating system: Linux
+Build image: ubuntu-22.04
+LLVM version: $PRISM_LLVM
+Source revision: $GITHUB_SHA
+EOF
 
           test -f "$package_root/lib/libprism-dynamic.so"
           test -f "$package_root/lib/libprism-static.so"
@@ -137,7 +130,6 @@ jobs:
 
   publish:
     name: attach-release-assets
-    if: github.event_name == 'release'
     needs: build
     runs-on: ubuntu-22.04
     permissions:
@@ -153,7 +145,7 @@ jobs:
       - name: Create checksums
         run: |
           cd dist
-          sha256sum ./*.tar.gz > SHA256SUMS
+          sha256sum *.tar.gz > SHA256SUMS
 
       - name: Attach packages to the GitHub release
         env:

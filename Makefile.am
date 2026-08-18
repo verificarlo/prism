@@ -30,6 +30,7 @@ EXTRA_DIST = \
 
 install-exec-hook:
 	@echo "Installing prism library"
+	$(MKDIR_P) $(DESTDIR)$(libdir)
 	install -m 0755 bazel-bin/external/+_repo_rules+hwy/libhwy.so $(DESTDIR)$(libdir)
 	install -m 0755 bazel-bin/src/libprism-dynamic-dbg.so $(DESTDIR)$(libdir)
 	install -m 0755 bazel-bin/src/libprism-dynamic.so $(DESTDIR)$(libdir)
