@@ -2,7 +2,8 @@ name: release-binaries
 
 on:
   release:
-    types: [published]
+    types: [published, created, prereleased]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -29,7 +30,7 @@ jobs:
       - name: Check out release source
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ github.event.release.tag_name || github.ref }}
 
       - name: Install LLVM
         uses: KyleMayes/install-llvm-action@v2.0.9
@@ -130,6 +131,7 @@ jobs:
 
   publish:
     name: attach-release-assets
+    if: github.event_name == 'release'
     needs: build
     runs-on: ubuntu-22.04
     permissions:
