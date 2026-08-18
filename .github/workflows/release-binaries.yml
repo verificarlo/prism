@@ -95,14 +95,14 @@ jobs:
           documentation_root="$package_root/share/doc/prism"
           mkdir -p "$documentation_root"
           install -m 0644 LICENSE README.md "$documentation_root"
-          cat > "$documentation_root/BUILD-INFO.txt" <<EOF
-PRISM version: $version
-Target architecture: $PRISM_ARCH
-Operating system: Linux
-Build image: ubuntu-22.04
-LLVM version: $PRISM_LLVM
-Source revision: $GITHUB_SHA
-EOF
+          cat <<EOF | sed 's/^[[:space:]]*//' > "$documentation_root/BUILD-INFO.txt"
+          PRISM version: $version
+          Target architecture: $PRISM_ARCH
+          Operating system: Linux
+          Build image: ubuntu-22.04
+          LLVM version: $PRISM_LLVM
+          Source revision: $GITHUB_SHA
+          EOF
 
           test -f "$package_root/lib/libprism-dynamic.so"
           test -f "$package_root/lib/libprism-static.so"
