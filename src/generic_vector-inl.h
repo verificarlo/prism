@@ -281,16 +281,23 @@ namespace fixed::HWY_NAMESPACE {
 namespace hn = hwy::HWY_NAMESPACE;
 namespace pr = PRISM_PR_MODE_NAMESPACE::PRISM_DISPATCH::HWY_NAMESPACE;
 
+// Fixed-width kernels use at least a full 128-bit vector so that no register
+// lanes lie outside the tag, and fill unused lanes with 1 so they never raise
+// spurious FP exceptions (e.g. 0/0 in div/sqrt) the old broadcast code avoided.
+template <typename T, std::size_t N>
+using FixedD = hn::CappedTag<T, HWY_MAX(N, 16 / sizeof(T))>;
+
 template <typename T, std::size_t N>
 HWY_FLATTEN void _addxN(const T *HWY_RESTRICT a, const T *HWY_RESTRICT b,
                         T *HWY_RESTRICT result) {
-  using D = hn::CappedTag<T, N>;
+  using D = FixedD<T, N>;
   const D d{};
-  const size_t lanes = hn::Lanes(d);
+  const size_t lanes = HWY_MIN(N, hn::Lanes(d));
+  const auto one = hn::Set(d, T{1});
   for (size_t i = 0; i < N; i += lanes) {
     const size_t count = N - i < lanes ? N - i : lanes;
-    const auto va = hn::LoadN(d, a + i, count);
-    const auto vb = hn::LoadN(d, b + i, count);
+    const auto va = hn::LoadNOr(one, d, a + i, count);
+    const auto vb = hn::LoadNOr(one, d, b + i, count);
     const auto res = pr::add(d, va, vb);
     hn::StoreN(res, d, result + i, count);
   }
@@ -299,13 +306,14 @@ HWY_FLATTEN void _addxN(const T *HWY_RESTRICT a, const T *HWY_RESTRICT b,
 template <typename T, std::size_t N>
 HWY_FLATTEN void _subxN(const T *HWY_RESTRICT a, const T *HWY_RESTRICT b,
                         T *HWY_RESTRICT result) {
-  using D = hn::CappedTag<T, N>;
+  using D = FixedD<T, N>;
   const D d{};
-  const size_t lanes = hn::Lanes(d);
+  const size_t lanes = HWY_MIN(N, hn::Lanes(d));
+  const auto one = hn::Set(d, T{1});
   for (size_t i = 0; i < N; i += lanes) {
     const size_t count = N - i < lanes ? N - i : lanes;
-    const auto va = hn::LoadN(d, a + i, count);
-    const auto vb = hn::LoadN(d, b + i, count);
+    const auto va = hn::LoadNOr(one, d, a + i, count);
+    const auto vb = hn::LoadNOr(one, d, b + i, count);
     const auto res = pr::sub(d, va, vb);
     hn::StoreN(res, d, result + i, count);
   }
@@ -314,13 +322,14 @@ HWY_FLATTEN void _subxN(const T *HWY_RESTRICT a, const T *HWY_RESTRICT b,
 template <typename T, std::size_t N>
 HWY_FLATTEN void _mulxN(const T *HWY_RESTRICT a, const T *HWY_RESTRICT b,
                         T *HWY_RESTRICT result) {
-  using D = hn::CappedTag<T, N>;
+  using D = FixedD<T, N>;
   const D d{};
-  const size_t lanes = hn::Lanes(d);
+  const size_t lanes = HWY_MIN(N, hn::Lanes(d));
+  const auto one = hn::Set(d, T{1});
   for (size_t i = 0; i < N; i += lanes) {
     const size_t count = N - i < lanes ? N - i : lanes;
-    const auto va = hn::LoadN(d, a + i, count);
-    const auto vb = hn::LoadN(d, b + i, count);
+    const auto va = hn::LoadNOr(one, d, a + i, count);
+    const auto vb = hn::LoadNOr(one, d, b + i, count);
     const auto res = pr::mul(d, va, vb);
     hn::StoreN(res, d, result + i, count);
   }
@@ -329,13 +338,14 @@ HWY_FLATTEN void _mulxN(const T *HWY_RESTRICT a, const T *HWY_RESTRICT b,
 template <typename T, std::size_t N>
 HWY_FLATTEN void _divxN(const T *HWY_RESTRICT a, const T *HWY_RESTRICT b,
                         T *HWY_RESTRICT result) {
-  using D = hn::CappedTag<T, N>;
+  using D = FixedD<T, N>;
   const D d{};
-  const size_t lanes = hn::Lanes(d);
+  const size_t lanes = HWY_MIN(N, hn::Lanes(d));
+  const auto one = hn::Set(d, T{1});
   for (size_t i = 0; i < N; i += lanes) {
     const size_t count = N - i < lanes ? N - i : lanes;
-    const auto va = hn::LoadN(d, a + i, count);
-    const auto vb = hn::LoadN(d, b + i, count);
+    const auto va = hn::LoadNOr(one, d, a + i, count);
+    const auto vb = hn::LoadNOr(one, d, b + i, count);
     const auto res = pr::div(d, va, vb);
     hn::StoreN(res, d, result + i, count);
   }
@@ -343,12 +353,13 @@ HWY_FLATTEN void _divxN(const T *HWY_RESTRICT a, const T *HWY_RESTRICT b,
 
 template <typename T, std::size_t N>
 HWY_FLATTEN void _sqrtxN(const T *HWY_RESTRICT a, T *HWY_RESTRICT result) {
-  using D = hn::CappedTag<T, N>;
+  using D = FixedD<T, N>;
   const D d{};
-  const size_t lanes = hn::Lanes(d);
+  const size_t lanes = HWY_MIN(N, hn::Lanes(d));
+  const auto one = hn::Set(d, T{1});
   for (size_t i = 0; i < N; i += lanes) {
     const size_t count = N - i < lanes ? N - i : lanes;
-    const auto va = hn::LoadN(d, a + i, count);
+    const auto va = hn::LoadNOr(one, d, a + i, count);
     const auto res = pr::sqrt(d, va);
     hn::StoreN(res, d, result + i, count);
   }
@@ -357,14 +368,15 @@ HWY_FLATTEN void _sqrtxN(const T *HWY_RESTRICT a, T *HWY_RESTRICT result) {
 template <typename T, std::size_t N>
 HWY_FLATTEN void _fmaxN(const T *HWY_RESTRICT a, const T *HWY_RESTRICT b,
                         const T *HWY_RESTRICT c, T *HWY_RESTRICT result) {
-  using D = hn::CappedTag<T, N>;
+  using D = FixedD<T, N>;
   const D d{};
-  const size_t lanes = hn::Lanes(d);
+  const size_t lanes = HWY_MIN(N, hn::Lanes(d));
+  const auto one = hn::Set(d, T{1});
   for (size_t i = 0; i < N; i += lanes) {
     const size_t count = N - i < lanes ? N - i : lanes;
-    const auto va = hn::LoadN(d, a + i, count);
-    const auto vb = hn::LoadN(d, b + i, count);
-    const auto vc = hn::LoadN(d, c + i, count);
+    const auto va = hn::LoadNOr(one, d, a + i, count);
+    const auto vb = hn::LoadNOr(one, d, b + i, count);
+    const auto vc = hn::LoadNOr(one, d, c + i, count);
     const auto res = pr::fma(d, va, vb, vc);
     hn::StoreN(res, d, result + i, count);
   }
