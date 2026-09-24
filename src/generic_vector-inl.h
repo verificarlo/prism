@@ -284,83 +284,89 @@ namespace pr = PRISM_PR_MODE_NAMESPACE::PRISM_DISPATCH::HWY_NAMESPACE;
 template <typename T, std::size_t N>
 HWY_FLATTEN void _addxN(const T *HWY_RESTRICT a, const T *HWY_RESTRICT b,
                         T *HWY_RESTRICT result) {
-  // Use element-wise processing for all targets to avoid FixedTag limitations
-  for (std::size_t i = 0; i < N; ++i) {
-    using D = hn::ScalableTag<T>;
-    const D d{};
-    const auto va = hn::Set(d, a[i]);
-    const auto vb = hn::Set(d, b[i]);
-    auto res = pr::add(d, va, vb);
-    result[i] = hn::GetLane(res);
+  using D = hn::CappedTag<T, N>;
+  const D d{};
+  const size_t lanes = hn::Lanes(d);
+  for (size_t i = 0; i < N; i += lanes) {
+    const size_t count = N - i < lanes ? N - i : lanes;
+    const auto va = hn::LoadN(d, a + i, count);
+    const auto vb = hn::LoadN(d, b + i, count);
+    const auto res = pr::add(d, va, vb);
+    hn::StoreN(res, d, result + i, count);
   }
 }
 
 template <typename T, std::size_t N>
 HWY_FLATTEN void _subxN(const T *HWY_RESTRICT a, const T *HWY_RESTRICT b,
                         T *HWY_RESTRICT result) {
-  // Use element-wise processing for all targets to avoid FixedTag limitations
-  for (std::size_t i = 0; i < N; ++i) {
-    using D = hn::ScalableTag<T>;
-    const D d{};
-    const auto va = hn::Set(d, a[i]);
-    const auto vb = hn::Set(d, b[i]);
-    auto res = pr::sub(d, va, vb);
-    result[i] = hn::GetLane(res);
+  using D = hn::CappedTag<T, N>;
+  const D d{};
+  const size_t lanes = hn::Lanes(d);
+  for (size_t i = 0; i < N; i += lanes) {
+    const size_t count = N - i < lanes ? N - i : lanes;
+    const auto va = hn::LoadN(d, a + i, count);
+    const auto vb = hn::LoadN(d, b + i, count);
+    const auto res = pr::sub(d, va, vb);
+    hn::StoreN(res, d, result + i, count);
   }
 }
 
 template <typename T, std::size_t N>
 HWY_FLATTEN void _mulxN(const T *HWY_RESTRICT a, const T *HWY_RESTRICT b,
                         T *HWY_RESTRICT result) {
-  // Use element-wise processing for all targets to avoid FixedTag limitations
-  for (std::size_t i = 0; i < N; ++i) {
-    using D = hn::ScalableTag<T>;
-    const D d{};
-    const auto va = hn::Set(d, a[i]);
-    const auto vb = hn::Set(d, b[i]);
-    auto res = pr::mul(d, va, vb);
-    result[i] = hn::GetLane(res);
+  using D = hn::CappedTag<T, N>;
+  const D d{};
+  const size_t lanes = hn::Lanes(d);
+  for (size_t i = 0; i < N; i += lanes) {
+    const size_t count = N - i < lanes ? N - i : lanes;
+    const auto va = hn::LoadN(d, a + i, count);
+    const auto vb = hn::LoadN(d, b + i, count);
+    const auto res = pr::mul(d, va, vb);
+    hn::StoreN(res, d, result + i, count);
   }
 }
 
 template <typename T, std::size_t N>
 HWY_FLATTEN void _divxN(const T *HWY_RESTRICT a, const T *HWY_RESTRICT b,
                         T *HWY_RESTRICT result) {
-  // Use element-wise processing for all targets to avoid FixedTag limitations
-  for (std::size_t i = 0; i < N; ++i) {
-    using D = hn::ScalableTag<T>;
-    const D d{};
-    const auto va = hn::Set(d, a[i]);
-    const auto vb = hn::Set(d, b[i]);
-    auto res = pr::div(d, va, vb);
-    result[i] = hn::GetLane(res);
+  using D = hn::CappedTag<T, N>;
+  const D d{};
+  const size_t lanes = hn::Lanes(d);
+  for (size_t i = 0; i < N; i += lanes) {
+    const size_t count = N - i < lanes ? N - i : lanes;
+    const auto va = hn::LoadN(d, a + i, count);
+    const auto vb = hn::LoadN(d, b + i, count);
+    const auto res = pr::div(d, va, vb);
+    hn::StoreN(res, d, result + i, count);
   }
 }
 
 template <typename T, std::size_t N>
 HWY_FLATTEN void _sqrtxN(const T *HWY_RESTRICT a, T *HWY_RESTRICT result) {
-  // Use element-wise processing for all targets to avoid FixedTag limitations
-  for (std::size_t i = 0; i < N; ++i) {
-    using D = hn::ScalableTag<T>;
-    const D d{};
-    const auto va = hn::Set(d, a[i]);
-    auto res = pr::sqrt(d, va);
-    result[i] = hn::GetLane(res);
+  using D = hn::CappedTag<T, N>;
+  const D d{};
+  const size_t lanes = hn::Lanes(d);
+  for (size_t i = 0; i < N; i += lanes) {
+    const size_t count = N - i < lanes ? N - i : lanes;
+    const auto va = hn::LoadN(d, a + i, count);
+    const auto res = pr::sqrt(d, va);
+    hn::StoreN(res, d, result + i, count);
   }
 }
 
 template <typename T, std::size_t N>
 HWY_FLATTEN void _fmaxN(const T *HWY_RESTRICT a, const T *HWY_RESTRICT b,
                         const T *HWY_RESTRICT c, T *HWY_RESTRICT result) {
-  // Use element-wise processing for all targets to avoid FixedTag limitations
-  for (std::size_t i = 0; i < N; ++i) {
-    using D = hn::ScalableTag<T>;
-    const D d{};
-    const auto va = hn::Set(d, a[i]);
-    const auto vb = hn::Set(d, b[i]);
-    const auto vc = hn::Set(d, c[i]);
-    auto res = pr::fma(d, va, vb, vc);
-    result[i] = hn::GetLane(res);
+  using D = hn::CappedTag<T, N>;
+  const D d{};
+  const size_t lanes = hn::Lanes(d);
+  for (size_t i = 0; i < N; i += lanes) {
+    const size_t count = N - i < lanes ? N - i : lanes;
+    const auto va = hn::LoadN(d, a + i, count);
+    const auto vb = hn::LoadN(d, b + i, count);
+    const auto vc = hn::LoadN(d, c + i, count);
+    const auto res = pr::fma(d, va, vb, vc);
+    hn::StoreN(res, d, result + i, count);
   }
 }
 
