@@ -69,9 +69,13 @@ public:
     std::string failure_reason;
   };
 
-  // Robust test with multiple strategies
-  auto test(int successes, int trials, double expected_probability)
-      -> TestResult {
+  // Robust test with retries. `successes` out of `trials` is the first sample.
+  // A retry draws a fresh, independent sample with `resample(n)`, which runs n
+  // new trials and returns the number of successes: reusing the first sample
+  // with a larger trial count would only bias the estimated proportion.
+  template <typename Resample>
+  auto test(int successes, int trials, double expected_probability,
+            Resample &&resample) -> TestResult {
     TestResult result;
 
     // Apply Bonferroni correction if enabled
@@ -106,10 +110,12 @@ public:
       // Calculate increased sample size for retries
       int current_trials = static_cast<int>(
           trials * std::pow(config_.retry_sample_multiplier, attempt - 1));
+      int current_successes =
+          attempt == 1 ? successes : resample(current_trials);
 
       // Perform binomial test
-      auto binomial_result =
-          binomial_test(current_trials, successes, expected_probability);
+      auto binomial_result = binomial_test(current_trials, current_successes,
+                                           expected_probability);
       result.pvalues_history.push_back(binomial_result.pvalue);
       result.final_pvalue = binomial_result.pvalue;
       result.final_alpha = current_alpha;

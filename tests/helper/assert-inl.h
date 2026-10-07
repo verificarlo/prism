@@ -19,6 +19,7 @@
 #include "tests/helper/distance.h"
 #include "tests/helper/operator.h"
 #include "tests/helper/pprint.h"
+#include "tests/helper/random.h"
 
 #include "hwy/highway.h"
 
@@ -324,11 +325,14 @@ void assert_value_eq_reference(const DistanceError<H> &distance_error,
   }
 }
 
-template <class M, typename Op, typename T, typename H = typename prism::utils::IEEE754<T>::H>
+// `resample(n)` draws n new samples for this lane and returns the number of
+// results rounded down; it is used by the robust test to retry.
+template <class M, typename Op, typename T, typename Resample,
+          typename H = typename prism::utils::IEEE754<T>::H>
 void assert_binomial_test(const DistanceError<H> &distance_error,
                           Counter<T> &counter, const BinomialTest &test,
                           Args<T> args, const double alpha, const int lane,
-                          const int lanes) {
+                          const int lanes, Resample &&resample) {
 
   const auto frequency = 1.0 / counter.count();
 
@@ -341,10 +345,15 @@ void assert_binomial_test(const DistanceError<H> &distance_error,
   static auto robust_config = prism::tests::helper::get_robust_test_config();
   robust_config.base_alpha = alpha;
   robust_config.num_tests_estimate = lanes; // Use actual number of lanes for Bonferroni correction
+  if constexpr (not M::is_sr) {
+    // Rejections are not asserted in UD mode: retrying would only cost time.
+    robust_config.max_retries = 1;
+  }
 
   prism::tests::helper::RobustBinomialTest robust_test(robust_config);
   auto pdown = static_cast<double>(distance_error.probability_down);
-  auto result = robust_test.test(counter.down_count(), counter.count(), pdown);
+  auto result = robust_test.test(counter.down_count(), counter.count(), pdown,
+                                 resample);
 
   if (!result.passed) {
     // Log robust test details for debugging
@@ -353,7 +362,13 @@ void assert_binomial_test(const DistanceError<H> &distance_error,
               << "  Final p-value: " << result.final_pvalue << "\n"
               << "  Final alpha: " << result.final_alpha << "\n"
               << "  Sample size: " << result.final_sample_size << "\n"
-              << "  Failure reason: " << result.failure_reason << "\n";
+              << "  Failure reason: " << result.failure_reason << "\n"
+              << "  p-values:";
+    for (const auto pvalue : result.pvalues_history) {
+      std::cerr << " " << pvalue;
+    }
+    std::cerr << "\n  Seeds: PRISM_SEED=" << prism_seed()
+              << " PRISM_TEST_SEED=" << test_seed() << "\n";
 
     print_assert_error<Op>(distance_error, counter, args, alpha, lane, lanes,
                            "Robust statistical test rejected null hypothesis!");
@@ -467,8 +482,13 @@ void CheckDistributionResults(D d, const ConfigTest &config, Args... args) {
 
     // binomial test
     auto test = binomial_test(config.repetitions, count_down, pdown);
+    const auto resample = [&](int repetitions) {
+      return eval_op<Op>(repetitions, d, static_cast<T>(distance_error.prev),
+                         static_cast<T>(distance_error.next), args...)[lane]
+          .down_count();
+    };
     assert_binomial_test<M, Op>(distance_error, counter, test, scalar_args,
-                                alpha_bon, lane, lanes);
+                                alpha_bon, lane, lanes, resample);
 
     lane++;
     debug_reset();
