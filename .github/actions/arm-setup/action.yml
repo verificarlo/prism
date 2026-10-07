@@ -30,6 +30,8 @@ runs:
           sudo apt-get install -y llvm-$v-dev
         fi
         /usr/lib/llvm-$v/bin/clang --version
+        # Same variable as KyleMayes/install-llvm-action on x86.
+        echo "LLVM_PATH=/usr/lib/llvm-$v" >> "$GITHUB_ENV"
     - name: Install Bazelisk
       shell: bash
       run: |

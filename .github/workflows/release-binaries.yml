@@ -11,7 +11,7 @@ permissions:
 jobs:
   build:
     name: linux-${{ matrix.arch }}-llvm${{ matrix.llvm }}
-    runs-on: ubuntu-22.04
+    runs-on: ${{ matrix.runner || 'ubuntu-22.04' }}
     strategy:
       fail-fast: false
       matrix:
@@ -25,6 +25,13 @@ jobs:
           - x86-64-v2
           - x86-64-v3
           - x86-64-v4
+          # Experimental: NEON only, built for the armv8-a baseline. The
+          # dynamic library still selects newer NEON targets at runtime.
+          - aarch64
+        include:
+          - arch: aarch64
+            runner: ubuntu-22.04-arm
+            march: armv8-a
 
     steps:
       - name: Check out release source
@@ -33,14 +40,23 @@ jobs:
           ref: ${{ github.event.release.tag_name || github.ref }}
 
       - name: Install LLVM
+        if: matrix.arch != 'aarch64'
         uses: KyleMayes/install-llvm-action@v2.0.9
         with:
           version: ${{ matrix.llvm }}
 
       - name: Install Bazelisk
+        if: matrix.arch != 'aarch64'
         uses: bazelbuild/setup-bazelisk@v3
 
+      - name: Install Arm build dependencies
+        if: matrix.arch == 'aarch64'
+        uses: ./.github/actions/arm-setup
+        with:
+          llvm: ${{ matrix.llvm }}
+
       - name: Install build dependencies
+        if: matrix.arch != 'aarch64'
         run: |
           set -euo pipefail
           sudo apt-get update
@@ -50,7 +66,8 @@ jobs:
         run: |
           set -euo pipefail
           ./autogen.sh
-          ./configure --prefix=/usr --with-arch="${{ matrix.arch }}"
+          ./configure --prefix=/usr --with-arch="${{ matrix.march || matrix.arch }}" \
+            || { cat config.log; exit 1; }
 
       - name: Build
         run: make
@@ -59,6 +76,7 @@ jobs:
         env:
           PRISM_ARCH: ${{ matrix.arch }}
           PRISM_LLVM: ${{ matrix.llvm }}
+          BUILD_IMAGE: ${{ matrix.runner || 'ubuntu-22.04' }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           set -euo pipefail
@@ -99,10 +117,17 @@ jobs:
           PRISM version: $version
           Target architecture: $PRISM_ARCH
           Operating system: Linux
-          Build image: ubuntu-22.04
+          Build image: $BUILD_IMAGE
           LLVM version: $PRISM_LLVM
           Source revision: $GITHUB_SHA
           EOF
+          if [ "$PRISM_ARCH" = aarch64 ]; then
+            echo "Support status: experimental (NEON targets only)" \
+              >> "$documentation_root/BUILD-INFO.txt"
+          fi
+          # The selected target describes the build machine, not the user's.
+          make -s target-info | grep -v selected \
+            >> "$documentation_root/BUILD-INFO.txt"
 
           test -f "$package_root/lib/libprism-dynamic.so"
           test -f "$package_root/lib/libprism-static.so"

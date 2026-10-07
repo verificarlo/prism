@@ -27,7 +27,7 @@ This combination of features makes the library versatile for scientific computin
 
 ## Binary releases
 
-Linux x86-64 binaries are attached to each [GitHub release](https://github.com/verificarlo/prism/releases). Choose the highest architecture level supported by every machine that will run the static-dispatch library and the LLVM major version used by your LLVM IR pipeline:
+Linux x86-64 and aarch64 binaries are attached to each [GitHub release](https://github.com/verificarlo/prism/releases). Choose the highest architecture level supported by every machine that will run the static-dispatch library and the LLVM major version used by your LLVM IR pipeline:
 
 | Architecture component | Minimum CPU features |
 | --- | --- |
@@ -35,6 +35,7 @@ Linux x86-64 binaries are attached to each [GitHub release](https://github.com/v
 | `x86-64-v2` | SSE3, SSSE3, SSE4.1, SSE4.2, and POPCNT |
 | `x86-64-v3` | AVX, AVX2, BMI1/2, F16C, FMA, and related features |
 | `x86-64-v4` | AVX-512 foundation and the standard v4 extensions |
+| `aarch64` | Armv8-A with NEON (**experimental**, see [Arm support](#arm-support-experimental)) |
 
 For example, set the desired release and LLVM versions and install the baseline package under `/usr/local`:
 
@@ -46,7 +47,9 @@ sudo tar -C /usr/local --strip-components=1 -xzf "prism-${VERSION}-linux-x86-64-
 sudo ldconfig
 ```
 
-Each release also includes `SHA256SUMS`. Archives are built on Ubuntu 22.04 for LLVM 17, 18, 19, and 20. They contain shared and static libraries, public headers, and generated LLVM IR files; select the matching `llvmN` archive when consuming those IR files. Package documentation and build metadata are installed under `share/doc/prism`. The dynamic-dispatch library selects a supported vector target at runtime; the static-dispatch library requires the CPU level named by the archive.
+On Arm, use the `linux-aarch64` archive instead.
+
+Each release also includes `SHA256SUMS`. Archives are built on Ubuntu 22.04 (x86-64 and arm64 runners) for LLVM 17, 18, 19, and 20. They contain shared and static libraries, public headers, and generated LLVM IR files; select the matching `llvmN` archive when consuming those IR files. Package documentation and build metadata are installed under `share/doc/prism`; `BUILD-INFO.txt` lists the Highway targets each library was built for. The dynamic-dispatch library selects a supported vector target at runtime; the static-dispatch library requires the CPU level named by the archive.
 
 ## Requirements
 
@@ -74,13 +77,25 @@ bazel test tests:all
 
 ## Current status
 
-The library is tested on x86-64. Arm (aarch64) support is **experimental**:
+The library is tested on x86-64. Arm (aarch64) support is experimental; see below.
 
-- NEON targets are built by default.
-- SVE targets are opt-in with `./configure --enable-experimental-sve` and need clang >= 22 (Highway generates no SVE code with older clang; clang 21 only supports `SVE2_128`).
-- `-march=native` falls back to a generic armv8 CPU when clang does not know the host CPU; pass `--with-arch` (e.g. `armv9-a+sve2`) in that case.
+## Arm support (experimental)
 
-`make target-info` prints the Highway targets the static and dynamic libraries were built for.
+- **NEON** targets are built by default and tested in CI on Neoverse N2 runners with LLVM 18 and 20. The `aarch64` release archives contain NEON code only; their dynamic library selects the best NEON target (up to `NEON_BF16`) at runtime.
+- **SVE** targets are opt-in with `./configure --enable-experimental-sve` and need clang >= 22: Highway generates no SVE code with older clang, and clang 21 only supports `SVE2_128`.
+- `-march=native` falls back to a generic Armv8 CPU when clang does not know the host CPU; pass `--with-arch` (e.g. `armv9-a+sve2`) in that case.
+- `make target-info` prints the Highway targets the static and dynamic libraries were built for, and the target the dynamic library selects on this machine.
+
+On a Cortex-X925 (128-bit SVE2 vectors), SVE is not faster than NEON with GCC or clang 22: the array interface is about 13% slower for stochastic rounding and 50-67% slower for up-down rounding. NEON is therefore the default.
+
+### Testing wider SVE vectors
+
+CI also runs the functional tests with 256- and 512-bit SVE vectors under QEMU user mode (the statistical accuracy tests are too slow to emulate). To do the same locally after configuring with `--enable-experimental-sve`:
+
+```bash
+# sve-default-vector-length is in bytes: 32 for 256-bit, 64 for 512-bit vectors.
+bazel test "--run_under=qemu-aarch64-static -cpu max,sve-default-vector-length=64" //tests/array:all
+```
 
 ## Publications
 
