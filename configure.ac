@@ -120,8 +120,6 @@ else
     AC_MSG_ERROR([$CLANG does not support -march=$PRISM_ARCH])
   fi
 fi
-AC_DEFINE_UNQUOTED([MARCH_FLAG], ["$MARCH_FLAG"], [Target architecture flag])
-AC_SUBST([MARCH_FLAG])
 
 dnl Experimental Arm support: NEON by default, SVE on request.
 AC_ARG_ENABLE(
@@ -169,8 +167,13 @@ if test "x$prism_aarch64" = "xyes"; then
     prism_march_sve=no
   fi
   AC_MSG_RESULT([$prism_march_sve])
+  dnl With SVE targets disabled, Highway's static target is NEON while the
+  dnl translation units would still be compiled for SVE: GCC then refuses to
+  dnl inline across the target mismatch, and SVE could still be emitted by
+  dnl the compiler outside Highway. Build for the same CPU without SVE instead.
   if test "x$prism_march_sve" = "xyes" && test "x$enable_experimental_sve" != "xyes"; then
-    AC_MSG_WARN([$MARCH_FLAG enables SVE, but SVE targets are disabled: the static library uses NEON. Use --enable-experimental-sve to build SVE targets.])
+    MARCH_FLAG="$MARCH_FLAG+nosve"
+    AC_MSG_WARN([SVE targets are disabled: using $MARCH_FLAG (NEON). Use --enable-experimental-sve to build SVE targets.])
   fi
 
   dnl Highway only generates SVE code with clang >= 21 (SVE2_128) or >= 22
@@ -186,6 +189,9 @@ if test "x$prism_aarch64" = "xyes"; then
 elif test "x$enable_experimental_sve" = "xyes"; then
   AC_MSG_WARN([--enable-experimental-sve has no effect on non-aarch64 targets])
 fi
+
+AC_DEFINE_UNQUOTED([MARCH_FLAG], ["$MARCH_FLAG"], [Target architecture flag])
+AC_SUBST([MARCH_FLAG])
 
 # Generate config files
 AC_CONFIG_FILES([Makefile])
