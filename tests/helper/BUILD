@@ -1,6 +1,7 @@
 filegroup(
     name = "headers-helper",
     srcs = [
+        "//tests/helper:benchmark.h",
         "//tests/helper:binomial_test.h",
         "//tests/helper:common.h",
         "//tests/helper:counter.h",
