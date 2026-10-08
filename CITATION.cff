@@ -7,7 +7,7 @@ authors:
     given-names: "Yohan"
 repository-code: "https://github.com/verificarlo/prism"
 url: "https://github.com/verificarlo/prism"
-version: "0.0.6"
+version: "0.0.12"
 license: "Apache-2.0"
 preferred-citation:
   type: article
