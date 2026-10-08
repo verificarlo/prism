@@ -15,10 +15,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Only the latest LLVM version tested in CI (docker-ci.yml). Earlier
+        # versions are still supported when building from source.
         llvm:
-          - 17
-          - 18
-          - 19
           - 20
         arch:
           - x86-64

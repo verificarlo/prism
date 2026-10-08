@@ -27,7 +27,7 @@ This combination of features makes the library versatile for scientific computin
 
 ## Binary releases
 
-Linux x86-64 and aarch64 binaries are attached to each [GitHub release](https://github.com/verificarlo/prism/releases). Choose the highest architecture level supported by every machine that will run the static-dispatch library and the LLVM major version used by your LLVM IR pipeline:
+Linux x86-64 and aarch64 binaries are attached to each [GitHub release](https://github.com/verificarlo/prism/releases). Choose the highest architecture level supported by every machine that will run the static-dispatch library:
 
 | Architecture component | Minimum CPU features |
 | --- | --- |
@@ -37,11 +37,11 @@ Linux x86-64 and aarch64 binaries are attached to each [GitHub release](https://
 | `x86-64-v4` | AVX-512 foundation and the standard v4 extensions |
 | `aarch64` | Armv8-A with NEON (**experimental**, see [Arm support](#arm-support-experimental)) |
 
-For example, set the desired release and LLVM versions and install the baseline package under `/usr/local`:
+For example, set the desired release and install the baseline package under `/usr/local`:
 
 ```bash
 VERSION=X.Y.Z
-LLVM_MAJOR=18
+LLVM_MAJOR=20
 curl -LO "https://github.com/verificarlo/prism/releases/download/v${VERSION}/prism-${VERSION}-linux-x86-64-llvm${LLVM_MAJOR}.tar.gz"
 sudo tar -C /usr/local --strip-components=1 -xzf "prism-${VERSION}-linux-x86-64-llvm${LLVM_MAJOR}.tar.gz"
 sudo ldconfig
@@ -49,7 +49,7 @@ sudo ldconfig
 
 On Arm, use the `linux-aarch64` archive instead.
 
-Each release also includes `SHA256SUMS`. Archives are built on Ubuntu 22.04 (x86-64 and arm64 runners) for LLVM 17, 18, 19, and 20. They contain shared and static libraries, public headers, and generated LLVM IR files; select the matching `llvmN` archive when consuming those IR files. Package documentation and build metadata are installed under `share/doc/prism`; `BUILD-INFO.txt` lists the Highway targets each library was built for. The dynamic-dispatch library selects a supported vector target at runtime; the static-dispatch library requires the CPU level named by the archive.
+Each release also includes `SHA256SUMS`. Archives are built on Ubuntu 22.04 (x86-64 and arm64 runners) for LLVM 20, the latest version tested in CI; the `llvmN` suffix in the archive name records it. They contain shared and static libraries, public headers, and generated LLVM IR files. To consume the IR files with an earlier LLVM version (17 to 19), [build from source](#build-and-install-from-source) with that version. Package documentation and build metadata are installed under `share/doc/prism`; `BUILD-INFO.txt` lists the Highway targets each library was built for. The dynamic-dispatch library selects a supported vector target at runtime; the static-dispatch library requires the CPU level named by the archive.
 
 ## Requirements
 
